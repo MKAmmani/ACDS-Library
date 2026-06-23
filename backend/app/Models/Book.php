@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class Book extends Model
 {
@@ -12,36 +11,39 @@ class Book extends Model
 
     protected $fillable = [
         'title',
-        'author',
-        'subject',
+        'authors',
+        'publisher',
+        'year',
         'isbn',
-        'format',
-        'status',
+        'edition',
         'description',
-        'publication_year',
+        'subject_area',
+        'call_number',
+        'shelf_location',
         'language',
-        'cover_image',
-        'file_path',
+        'format',
+        'material_type',
+        'number_of_copies',
+        'available_copies',
+        'cover_treatment',
     ];
-
-    protected $appends = ['cover_image_url', 'has_file'];
 
     protected function casts(): array
     {
         return [
-            'publication_year' => 'integer',
+            'year'             => 'integer',
+            'number_of_copies' => 'integer',
+            'available_copies' => 'integer',
         ];
     }
 
-    public function getCoverImageUrlAttribute(): ?string
+    public function loans()
     {
-        return $this->cover_image
-            ? Storage::disk('public')->url($this->cover_image)
-            : null;
+        return $this->hasMany(Loan::class);
     }
 
-    public function getHasFileAttribute(): bool
+    public function reservations()
     {
-        return ! is_null($this->file_path);
+        return $this->hasMany(Reservation::class);
     }
 }

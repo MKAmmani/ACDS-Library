@@ -1,3 +1,9 @@
+# Allow uploads up to 1 GB
+<IfModule mod_php.c>
+    php_value upload_max_filesize 1G
+    php_value post_max_size       1G
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

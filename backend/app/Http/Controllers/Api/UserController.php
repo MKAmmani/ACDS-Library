@@ -71,6 +71,32 @@ class UserController extends Controller
         return response()->json($user->fresh());
     }
 
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name'    => ['sometimes', 'string', 'max:255'],
+            'phone'   => ['nullable', 'string', 'max:20'],
+            'address' => ['nullable', 'string'],
+        ]);
+
+        $request->user()->update($data);
+
+        return response()->json($request->user()->fresh());
+    }
+
+    public function updateMembership(Request $request, User $user): JsonResponse
+    {
+        $data = $request->validate([
+            'member_number'         => ['nullable', 'string', 'max:20', 'unique:users,member_number,' . $user->id],
+            'membership_type'       => ['sometimes', Rule::in(['student', 'staff', 'faculty', 'public'])],
+            'membership_expires_at' => ['nullable', 'date'],
+        ]);
+
+        $user->update($data);
+
+        return response()->json($user->fresh());
+    }
+
     public function destroy(Request $request, User $user): JsonResponse
     {
         if ($user->id === $request->user()->id) {

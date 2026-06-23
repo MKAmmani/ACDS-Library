@@ -13,6 +13,8 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
+        $this->call(LoanPolicySeeder::class);
+
         // Default admin account
         User::firstOrCreate(
             ['email' => 'admin@acds-library.com'],
