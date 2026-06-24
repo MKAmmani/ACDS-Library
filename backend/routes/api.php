@@ -45,7 +45,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     | Authenticated user + admin routes
     |----------------------------------------------------------------------
     */
-    Route::middleware('role:user,admin')->group(function () {
+    Route::middleware('role:user,staff,admin')->group(function () {
         Route::get('/repository/{institutionalRepository}/download', [InstitutionalRepositoryController::class, 'download']);
 
         // Reservations — any logged-in user can reserve
@@ -58,7 +58,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     | Admin-only routes
     |----------------------------------------------------------------------
     */
-    Route::middleware('role:admin')->prefix('admin')->group(function () {
+    Route::middleware('role:staff,admin')->prefix('admin')->group(function () {
         // Book management (metadata only)
         Route::post('/books',          [BookController::class, 'store']);
         Route::patch('/books/{book}',  [BookController::class, 'update']);

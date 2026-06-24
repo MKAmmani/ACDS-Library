@@ -42,12 +42,22 @@ class UserController extends Controller
 
     public function updateRole(Request $request, User $user): JsonResponse
     {
-        if ($user->id === $request->user()->id) {
+        $actor = $request->user();
+
+        if ($user->id === $actor->id) {
             return response()->json(['message' => 'You cannot change your own role.'], 422);
         }
 
+        // Staff cannot manage other staff or admin accounts
+        if ($actor->isStaff() && in_array($user->role, ['admin', 'staff'])) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        // Staff can only assign the user role; admin can assign any role
+        $allowedRoles = $actor->isAdmin() ? ['admin', 'staff', 'user'] : ['user'];
+
         $data = $request->validate([
-            'role' => ['required', Rule::in(['admin', 'user'])],
+            'role' => ['required', Rule::in($allowedRoles)],
         ]);
 
         $user->update($data);
@@ -57,12 +67,18 @@ class UserController extends Controller
 
     public function toggleActive(Request $request, User $user): JsonResponse
     {
-        if ($user->id === $request->user()->id) {
+        $actor = $request->user();
+
+        if ($user->id === $actor->id) {
             return response()->json(['message' => 'You cannot deactivate your own account.'], 422);
         }
 
+        // Staff cannot manage other staff or admin accounts
+        if ($actor->isStaff() && in_array($user->role, ['admin', 'staff'])) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
         if ($user->is_active) {
-            // Deactivating — revoke all tokens so they can't keep using the API
             $user->tokens()->delete();
         }
 
@@ -99,8 +115,15 @@ class UserController extends Controller
 
     public function destroy(Request $request, User $user): JsonResponse
     {
-        if ($user->id === $request->user()->id) {
+        $actor = $request->user();
+
+        if ($user->id === $actor->id) {
             return response()->json(['message' => 'You cannot delete your own account.'], 422);
+        }
+
+        // Staff cannot delete other staff or admin accounts
+        if ($actor->isStaff() && in_array($user->role, ['admin', 'staff'])) {
+            return response()->json(['message' => 'Forbidden.'], 403);
         }
 
         $user->tokens()->delete();

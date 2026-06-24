@@ -15,13 +15,23 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(LoanPolicySeeder::class);
 
-        // Default admin account
+        // Super admin — full system oversight, manages staff accounts
         User::firstOrCreate(
-            ['email' => 'admin@acds-library.com'],
+            ['email' => 'superadmin@acds-library.com'],
             [
-                'name'     => 'System Administrator',
+                'name'     => 'Super Administrator',
                 'password' => Hash::make('Admin@12345'),
                 'role'     => 'admin',
+            ]
+        );
+
+        // Staff account — same access as admin except cannot manage staff/admin users
+        User::firstOrCreate(
+            ['email' => 'staff@acds-library.com'],
+            [
+                'name'     => 'System Staff',
+                'password' => Hash::make('Staff@12345'),
+                'role'     => 'staff',
             ]
         );
 
