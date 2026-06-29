@@ -34,8 +34,16 @@ class LoanController extends Controller
             $query->where('book_id', $request->book_id);
         }
 
+        if ($request->boolean('today')) {
+            $today = now()->format('Y-m-d');
+            $query->where(function ($q) use ($today) {
+                $q->whereDate('borrowed_at', $today)
+                  ->orWhereDate('returned_at', $today);
+            });
+        }
+
         return response()->json(
-            $query->orderByDesc('borrowed_at')->paginate(20)
+            $query->orderByDesc('updated_at')->paginate(50)
         );
     }
 
@@ -149,6 +157,18 @@ class LoanController extends Controller
         }
 
         return response()->json($response);
+    }
+
+    public function renew(Loan $loan): JsonResponse
+    {
+        if ($loan->status !== 'active') {
+            return response()->json(['message' => 'Only active loans can be renewed.'], 422);
+        }
+
+        $policy = LoanPolicy::forUser($loan->user);
+        $loan->update(['due_date' => now()->addDays($policy->loan_days)]);
+
+        return response()->json($loan->fresh()->load(['book:id,title,authors', 'user:id,name,email,member_number']));
     }
 
     public function myLoans(Request $request): JsonResponse

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\InstitutionalRepository;
+use App\Models\RepositoryDownload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -45,6 +46,15 @@ class InstitutionalRepositoryController extends Controller
         return response()->json(
             $query->orderBy('title')->paginate(20)
         );
+    }
+
+    public function stats(): JsonResponse
+    {
+        return response()->json([
+            'total'         => InstitutionalRepository::count(),
+            'storage_bytes' => (int) InstitutionalRepository::sum('file_size'),
+            'downloads_30d' => RepositoryDownload::where('created_at', '>=', now()->subDays(30))->count(),
+        ]);
     }
 
     public function show(InstitutionalRepository $institutionalRepository): JsonResponse
@@ -157,6 +167,11 @@ class InstitutionalRepositoryController extends Controller
         if (! $institutionalRepository->file_path || ! Storage::disk('local')->exists($institutionalRepository->file_path)) {
             return response()->json(['message' => 'No file available for this repository item.'], 404);
         }
+
+        RepositoryDownload::create([
+            'repository_id' => $institutionalRepository->id,
+            'user_id'       => auth()->id(),
+        ]);
 
         $ext = $institutionalRepository->file_type
             ?? pathinfo($institutionalRepository->file_path, PATHINFO_EXTENSION);

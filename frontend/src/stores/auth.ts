@@ -8,6 +8,7 @@ interface AuthUser {
   email: string
   role: 'admin' | 'staff' | 'user'
   is_active: boolean
+  member_number?: string
 }
 
 interface LoginResponse {
@@ -24,15 +25,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(email: string, password: string) {
     const res = await apiPost<LoginResponse>('/auth/login', { email, password })
-
     user.value  = res.user
     token.value = res.token
-
     localStorage.setItem('auth_token', res.token)
     localStorage.setItem('auth_user',  JSON.stringify(res.user))
   }
 
-  function logout() {
+  async function logout() {
+    if (token.value) {
+      try { await apiPost('/auth/logout', {}, token.value) } catch {}
+    }
     user.value  = null
     token.value = null
     localStorage.removeItem('auth_token')

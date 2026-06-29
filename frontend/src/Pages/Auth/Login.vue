@@ -18,13 +18,11 @@ async function handleLogin() {
   try {
     await auth.login(email.value, password.value)
 
-    if (!auth.isStaff) {
-      auth.logout()
-      error.value = 'Access denied. This panel is for staff and admin accounts only.'
-      return
+    if (auth.isStaff) {
+      router.push('/staff/dashboard')
+    } else {
+      router.push('/user/my-account')
     }
-
-    router.push('/staff/dashboard')
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Login failed. Please try again.'
   } finally {
@@ -51,7 +49,7 @@ async function handleLogin() {
       <!-- Heading -->
       <div class="auth-head">
         <h1 class="auth-title">Welcome back</h1>
-        <p class="auth-sub">Sign in to your staff account to continue</p>
+        <p class="auth-sub">Sign in to your account to continue</p>
       </div>
 
       <!-- Error banner -->
@@ -103,7 +101,7 @@ async function handleLogin() {
 
       <!-- Footer note -->
       <p class="auth-footer">
-        Staff &amp; admin access only. Contact your system administrator if you need an account.
+        Staff and members sign in here. Contact the library if you need an account.
       </p>
 
     </div>
