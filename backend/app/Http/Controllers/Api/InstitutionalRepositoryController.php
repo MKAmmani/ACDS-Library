@@ -153,13 +153,27 @@ class InstitutionalRepositoryController extends Controller
         return response()->json(['message' => 'Repository item deleted successfully.']);
     }
 
-    public function read(InstitutionalRepository $institutionalRepository): StreamedResponse|JsonResponse
+    public function read(InstitutionalRepository $institutionalRepository): \Symfony\Component\HttpFoundation\BinaryFileResponse|JsonResponse
     {
         if (! $institutionalRepository->file_path || ! Storage::disk('local')->exists($institutionalRepository->file_path)) {
             return response()->json(['message' => 'No file available for this repository item.'], 404);
         }
 
-        return Storage::disk('local')->response($institutionalRepository->file_path);
+        $fullPath = Storage::disk('local')->path($institutionalRepository->file_path);
+        $ext      = strtolower($institutionalRepository->file_type ?? pathinfo($fullPath, PATHINFO_EXTENSION));
+
+        $mime = match ($ext) {
+            'pdf'  => 'application/pdf',
+            'epub' => 'application/epub+zip',
+            'doc'  => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            default => mime_content_type($fullPath) ?: 'application/octet-stream',
+        };
+
+        return response()->file($fullPath, [
+            'Content-Type'        => $mime,
+            'Content-Disposition' => 'inline; filename="' . rawurlencode($institutionalRepository->title . '.' . $ext) . '"',
+        ]);
     }
 
     public function download(InstitutionalRepository $institutionalRepository): StreamedResponse|JsonResponse

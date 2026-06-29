@@ -85,21 +85,23 @@ function msgSide(msg: any): 'mine' | 'theirs' {
 }
 
 // ── Load lists ────────────────────────────────────────────────────────────────
-async function loadMemberThreads() {
-  loadingM.value = true
+async function loadMemberThreads(bustCache = false) {
+  if (!bustCache) loadingM.value = true
   try {
     let q = '?channel=user_to_staff'
     if (statusFilter.value) q += `&status=${statusFilter.value}`
     if (typeFilter.value)   q += `&type=${typeFilter.value}`
+    if (bustCache)          q += `&_t=${Date.now()}`
     const res = await apiGet<any>(`/admin/inbox${q}`, auth.token ?? undefined)
     memberThreads.value = res.data ?? []
   } catch {} finally { loadingM.value = false }
 }
 
-async function loadStaffThreads() {
-  loadingS.value = true
+async function loadStaffThreads(bustCache = false) {
+  if (!bustCache) loadingS.value = true
   try {
-    const res = await apiGet<any>('/admin/inbox?channel=staff_to_admin', auth.token ?? undefined)
+    const ts = bustCache ? `&_t=${Date.now()}` : ''
+    const res = await apiGet<any>(`/admin/inbox?channel=staff_to_admin${ts}`, auth.token ?? undefined)
     staffThreads.value = res.data ?? []
   } catch {} finally { loadingS.value = false }
 }
@@ -122,12 +124,11 @@ async function openThread(t: any) {
     scrollToBottom()
   } catch {} finally { loadingMsgs.value = false }
 
-  // Poll for new messages every 10s while thread is open
   if (msgPollTimer) clearInterval(msgPollTimer)
   msgPollTimer = setInterval(async () => {
     if (document.hidden || !showThread.value) return
     try {
-      const fresh = await apiGet<any[]>(`/admin/inbox/${t.id}/messages`, auth.token ?? undefined)
+      const fresh = await apiGet<any[]>(`/admin/inbox/${t.id}/messages?_t=${Date.now()}`, auth.token ?? undefined)
       if (fresh.length !== threadMsgs.value.length) {
         threadMsgs.value = fresh
         scrollToBottom()
@@ -249,8 +250,8 @@ onMounted(() => {
   loadMemberThreads()
   listPollTimer = setInterval(() => {
     if (document.hidden) return
-    if (activeTab.value === 'user_to_staff') loadMemberThreads()
-    else loadStaffThreads()
+    if (activeTab.value === 'user_to_staff') loadMemberThreads(true)
+    else loadStaffThreads(true)
   }, 30_000)
 })
 

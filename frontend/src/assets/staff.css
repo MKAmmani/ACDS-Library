@@ -13,6 +13,7 @@
   --bg: #F4F6FA; --card: #FFFFFF;
   --sb: #0C2147; --sb-hi: #15315F; --sb-act: #1763C9;
   --sb-tx: rgba(255,255,255,.62); --sb-tx-a: #fff;
+  --cv-blue: #1763C9;
   --cv-navy: #22304F; --cv-burgundy: #5E2A35; --cv-forest: #234034;
   --cv-slate: #33526E; --cv-charcoal: #2B2D31; --cv-ochre: #6E5630;
   --cv-ink: #EDE6D3; --cv-rule: #C9A24B;
@@ -43,6 +44,7 @@ input, select, textarea { font-family: var(--ui); }
 .cover-top  { padding: 6px 5px 0 7px; position: relative; z-index: 3; }
 .cover-rule { height: 1px; background: var(--cv-rule); opacity: .6; margin-bottom: 4px; width: 60%; }
 .cover-t    { font-family: var(--serif); font-weight: 600; color: var(--cv-ink); line-height: 1.15; font-size: 6.5px; }
+.cv-blue     { background: var(--cv-blue); }
 .cv-navy     { background: var(--cv-navy); }
 .cv-burgundy { background: var(--cv-burgundy); }
 .cv-forest   { background: var(--cv-forest); }

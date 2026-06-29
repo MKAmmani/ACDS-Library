@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { onUnauthorized } from '@/api/http'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -69,6 +71,13 @@ router.beforeEach((to) => {
 
   // Regular members cannot access the staff panel
   if (wantsStaff && token && role === 'user') return '/user/my-account'
+})
+
+// When any API call returns 401, the token is stale — clear session and go to login
+onUnauthorized(() => {
+  const auth = useAuthStore()
+  auth.logout()
+  router.push('/auth/login')
 })
 
 export default router

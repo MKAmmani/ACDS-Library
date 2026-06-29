@@ -17,7 +17,10 @@ const resources     = ref<any[]>([])
 const currentPage   = ref(1)
 const lastPage      = ref(1)
 const total         = ref(0)
-const downloading   = ref<number | null>(null)
+const downloading    = ref<number | null>(null)
+const showReader     = ref(false)
+const readerUrl      = ref('')
+const readerTitle    = ref('')
 
 const formats = ['All', 'eBook', 'Report', 'Thesis', 'Policy Brief']
 const topics  = ['All', 'Democracy', 'Governance', 'Electoral', 'History', 'Law', 'Civil Society']
@@ -80,7 +83,18 @@ function formatFileSize(bytes: number | null) {
 }
 
 function readOnline(item: any) {
-  window.open(`${BASE_URL}/repository/${item.id}/read`, '_blank')
+  // Point the iframe directly at the public /read endpoint. The backend serves
+  // the file inline (Content-Disposition: inline), so the browser's native PDF
+  // viewer renders it. No fetch/blob — that would require CORS read access; an
+  // iframe just displaying a cross-origin PDF does not.
+  readerUrl.value   = `${BASE_URL}/repository/${item.id}/read`
+  readerTitle.value = item.title
+  showReader.value  = true
+}
+
+function closeReader() {
+  showReader.value = false
+  readerUrl.value  = ''
 }
 
 async function downloadItem(item: any) {
@@ -249,7 +263,7 @@ const pages = computed(() => {
           ‹
         </button>
         <template v-for="(pg, i) in pages" :key="pg">
-          <span v-if="i > 0 && pg - pages[i-1] > 1"
+          <span v-if="i > 0 && pg - (pages[i-1] ?? 0) > 1"
             class="min-w-[32px] h-[32px] flex items-center justify-center text-[12.5px] text-[var(--faint)]">…</span>
           <button @click="goToPage(pg)"
             :class="['min-w-[32px] h-[32px] px-1.5 flex items-center justify-center border rounded-md text-[12.5px] cursor-pointer transition-all',
@@ -265,4 +279,24 @@ const pages = computed(() => {
       </div>
     </div>
   </div>
+
+  <!-- ── Document Reader Modal ── -->
+  <Teleport to="body">
+    <div v-if="showReader" class="fixed inset-0 z-[999] flex flex-col" style="background:rgba(0,0,0,.72)">
+      <div class="flex items-center justify-between gap-4 px-5 py-3 bg-white border-b border-[var(--line)] flex-shrink-0">
+        <div class="text-[13.5px] font-semibold text-[var(--navy)] truncate">{{ readerTitle }}</div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <a :href="readerUrl" target="_blank"
+            class="btn btn-ghost btn-sm flex items-center gap-1.5 text-[12.5px]">
+            <LucideIcon name="external-link" :size="14" /> Open in tab
+          </a>
+          <button class="w-8 h-8 flex items-center justify-center rounded-md border border-[var(--line)] text-[var(--muted)] hover:bg-[var(--bg)]"
+            @click="closeReader">
+            <LucideIcon name="x" :size="16" />
+          </button>
+        </div>
+      </div>
+      <iframe :src="readerUrl" class="flex-1 w-full border-none bg-white" allow="fullscreen"></iframe>
+    </div>
+  </Teleport>
 </template>

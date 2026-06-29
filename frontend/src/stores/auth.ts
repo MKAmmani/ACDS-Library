@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { apiPost } from '@/api/http'
+import { BASE, apiPost, resetUnauthorized } from '@/api/http'
 
 interface AuthUser {
   id: number
@@ -25,6 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(email: string, password: string) {
     const res = await apiPost<LoginResponse>('/auth/login', { email, password })
+    resetUnauthorized()   // allow 401 handling again after a fresh login
     user.value  = res.user
     token.value = res.token
     localStorage.setItem('auth_token', res.token)
@@ -32,8 +33,15 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    // Use raw fetch — not apiPost — so a stale-token 401 on the logout endpoint
+    // doesn't re-trigger handle401 and cause an infinite loop.
     if (token.value) {
-      try { await apiPost('/auth/logout', {}, token.value) } catch {}
+      try {
+        await fetch(`${BASE}/auth/logout`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token.value}`, 'Accept': 'application/json' },
+        })
+      } catch {}
     }
     user.value  = null
     token.value = null

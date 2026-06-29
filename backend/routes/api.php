@@ -68,6 +68,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/books',          [BookController::class, 'store']);
         Route::patch('/books/{book}',  [BookController::class, 'update']);
         Route::delete('/books/{book}', [BookController::class, 'destroy']);
+        Route::get('/books/{book}/copies',  [BookController::class, 'copies']);
+        Route::put('/books/{book}/copies',  [BookController::class, 'saveCopies']);
 
         // Repository
         Route::post('/repository',                                [InstitutionalRepositoryController::class, 'store']);

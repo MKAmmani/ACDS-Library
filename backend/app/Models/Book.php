@@ -37,6 +37,11 @@ class Book extends Model
         ];
     }
 
+    public function copies()
+    {
+        return $this->hasMany(BookCopy::class)->orderBy('copy_number');
+    }
+
     public function loans()
     {
         return $this->hasMany(Loan::class);

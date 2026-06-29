@@ -95,6 +95,9 @@ const showSavedModal  = ref(false)
 const showDeleteModal = ref(false)
 const deletingDoc     = ref<RepoItem | null>(null)
 const deleting        = ref(false)
+const showReader      = ref(false)
+const readerUrl       = ref('')
+const readerTitle     = ref('')
 
 // ── Form ──────────────────────────────────────────────────────────────────────
 function emptyForm() {
@@ -225,7 +228,16 @@ async function confirmDelete() {
 }
 
 function openDoc(doc: RepoItem) {
-  window.open(`${BASE_URL}/repository/${doc.id}/read`, '_blank')
+  // Direct iframe load of the public /read endpoint (served inline by the
+  // backend). No fetch/blob — an iframe rendering a cross-origin PDF needs no CORS.
+  readerUrl.value   = `${BASE_URL}/repository/${doc.id}/read`
+  readerTitle.value = doc.title
+  showReader.value  = true
+}
+
+function closeReader() {
+  showReader.value = false
+  readerUrl.value  = ''
 }
 
 async function downloadDoc(doc: RepoItem) {
@@ -585,6 +597,24 @@ onMounted(() => { fetchDocs(); fetchStats() })
       </div>
     </div>
   </div>
+
+  <!-- ── Document Reader ── -->
+  <Teleport to="body">
+    <div v-if="showReader" style="position:fixed;inset:0;z-index:999;display:flex;flex-direction:column;background:rgba(0,0,0,.72)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 18px;background:#fff;border-bottom:1px solid var(--line);flex-shrink:0">
+        <div style="font-size:13.5px;font-weight:600;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ readerTitle }}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <a :href="readerUrl" target="_blank" class="btn btn-ghost btn-sm" style="display:flex;align-items:center;gap:6px">
+            <LucideIcon name="external-link" class="ic-sm" /> Open in tab
+          </a>
+          <button class="btn btn-ghost btn-sm" @click="closeReader">
+            <LucideIcon name="x" class="ic-sm" />
+          </button>
+        </div>
+      </div>
+      <iframe :src="readerUrl" style="flex:1;width:100%;border:none;background:#fff" allow="fullscreen"></iframe>
+    </div>
+  </Teleport>
 
   <!-- ── Modal: Delete ── -->
   <div :class="['mscrim', { open: showDeleteModal }]" @click.self="showDeleteModal = false">

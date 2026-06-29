@@ -112,4 +112,55 @@ class BookController extends Controller
 
         return response()->json(['message' => 'Book deleted successfully.']);
     }
+
+    /**
+     * List accession numbers for each physical copy of a book. Returns one slot
+     * per copy (1 … number_of_copies), pre-filled with any stored accession number.
+     */
+    public function copies(Book $book): JsonResponse
+    {
+        $total = max(1, (int) $book->number_of_copies);
+        $stored = $book->copies()->pluck('accession_number', 'copy_number');
+
+        $copies = [];
+        for ($n = 1; $n <= $total; $n++) {
+            $copies[] = [
+                'copy_number'      => $n,
+                'accession_number' => $stored[$n] ?? null,
+            ];
+        }
+
+        return response()->json([
+            'book_id'          => $book->id,
+            'title'            => $book->title,
+            'number_of_copies' => $total,
+            'copies'           => $copies,
+        ]);
+    }
+
+    /**
+     * Upsert the accession number for each copy of a book.
+     */
+    public function saveCopies(Request $request, Book $book): JsonResponse
+    {
+        $data = $request->validate([
+            'copies'                     => ['required', 'array'],
+            'copies.*.copy_number'       => ['required', 'integer', 'min:1'],
+            'copies.*.accession_number'  => ['nullable', 'string', 'max:100'],
+        ]);
+
+        foreach ($data['copies'] as $copy) {
+            $accession = isset($copy['accession_number']) ? trim((string) $copy['accession_number']) : '';
+
+            $book->copies()->updateOrCreate(
+                ['copy_number' => $copy['copy_number']],
+                ['accession_number' => $accession !== '' ? $accession : null],
+            );
+        }
+
+        return response()->json([
+            'message' => 'Accession numbers saved.',
+            'copies'  => $book->copies()->get(['copy_number', 'accession_number']),
+        ]);
+    }
 }

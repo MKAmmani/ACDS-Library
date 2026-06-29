@@ -177,7 +177,7 @@ class MarcParser
             'format'           => 'Book (Physical)',
             'number_of_copies' => 1,
             'available_copies' => 1,
-            'cover_treatment'  => 'cv-navy',
+            'cover_treatment'  => 'cv-blue',
         ], fn ($v) => $v !== null && $v !== '');
     }
 

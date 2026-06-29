@@ -311,7 +311,7 @@ function copyCite() {
             {{ g.label }} <LucideIcon name="chevron-down" :size="13" class="text-[var(--faint)]" />
           </div>
           <div class="flex flex-col gap-2">
-            <label v-for="[opt] in g.opts" :key="opt" class="flex items-center gap-2 cursor-pointer group">
+            <label v-for="opt in g.opts.map(o => o[0]!)" :key="opt" class="flex items-center gap-2 cursor-pointer group">
               <span :class="['w-4 h-4 border-[1.75px] rounded border-[var(--line)] flex items-center justify-center transition-all flex-shrink-0 group-hover:border-[var(--blue)]',
                 (filters[g.key] as string[]).includes(opt) ? '!bg-[var(--blue)] !border-[var(--blue)]' : '']"
                 @click="toggleFilter(g.key, opt)">
@@ -515,7 +515,7 @@ function copyCite() {
               :class="['min-w-[32px] h-[32px] px-1.5 flex items-center justify-center border rounded-md text-[12.5px] transition-all',
                 currentPage===1 ? 'bg-[var(--bg)] border-[var(--line)] text-[var(--faint)] cursor-not-allowed' : 'bg-white border-[var(--line)] text-[var(--muted)] hover:border-[var(--blue)] hover:text-[var(--blue)] cursor-pointer']">‹</button>
             <template v-for="(pg, i) in pagesArr" :key="pg">
-              <span v-if="i > 0 && pg - pagesArr[i-1] > 1"
+              <span v-if="i > 0 && pg - (pagesArr[i-1] ?? 0) > 1"
                 class="min-w-[32px] h-[32px] flex items-center justify-center text-[12.5px] text-[var(--faint)]">…</span>
               <button @click="goToPage(pg)"
                 :class="['min-w-[32px] h-[32px] px-1.5 flex items-center justify-center border rounded-md text-[12.5px] cursor-pointer transition-all',

@@ -64,10 +64,11 @@ function formatTime(d: string) {
   return new Date(d).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })
 }
 
-async function loadThreads() {
-  threadsLoading.value = true
+async function loadThreads(bustCache = false) {
+  if (!bustCache) threadsLoading.value = true
   try {
-    const data = await apiGet<any>('/inbox/threads', auth.token ?? undefined)
+    const q = bustCache ? `?_t=${Date.now()}` : ''
+    const data = await apiGet<any>(`/inbox/threads${q}`, auth.token ?? undefined)
     threads.value = data.data ?? []
   } catch {}
   threadsLoading.value = false
@@ -82,12 +83,11 @@ async function openThread(thread: any) {
   } catch {}
   messagesLoading.value = false
 
-  // Poll for new messages every 10s while this thread is open
   if (msgPollTimer) clearInterval(msgPollTimer)
   msgPollTimer = setInterval(async () => {
     if (document.hidden || !activeThread.value) return
     try {
-      const data = await apiGet<any>(`/inbox/threads/${thread.id}/messages`, auth.token ?? undefined)
+      const data = await apiGet<any>(`/inbox/threads/${thread.id}/messages?_t=${Date.now()}`, auth.token ?? undefined)
       const fresh = Array.isArray(data) ? data : (data.data ?? [])
       if (fresh.length !== messages.value.length) {
         messages.value = fresh
@@ -146,7 +146,7 @@ function switchToThreads() {
 onMounted(() => {
   loadThreads()
   listPollTimer = setInterval(() => {
-    if (!document.hidden) loadThreads()
+    if (!document.hidden) loadThreads(true)
   }, 30_000)
 })
 

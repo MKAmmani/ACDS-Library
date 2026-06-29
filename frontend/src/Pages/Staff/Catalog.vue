@@ -2,7 +2,7 @@
 import { ref, reactive, watch, onMounted } from 'vue'
 import LucideIcon from '@/components/LucideIcon.vue'
 import { useAuthStore } from '@/stores/auth'
-import { apiGet, apiPost, apiPatch, apiDelete, apiUpload } from '@/api/http'
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete, apiUpload } from '@/api/http'
 
 const auth = useAuthStore()
 
@@ -59,7 +59,7 @@ const deletingBook    = ref<Book | null>(null)
 const deleting        = ref(false)
 
 // ── Form ─────────────────────────────────────────────────────────────────────
-const covers = ['cv-navy', 'cv-burgundy', 'cv-forest', 'cv-slate', 'cv-charcoal', 'cv-ochre']
+const covers = ['cv-blue', 'cv-navy', 'cv-burgundy', 'cv-forest', 'cv-slate', 'cv-charcoal', 'cv-ochre']
 
 function emptyForm() {
   return {
@@ -67,7 +67,7 @@ function emptyForm() {
     isbn: '', edition: '', description: '',
     subject_area: '', call_number: '', shelf_location: '',
     language: 'English', format: 'Book (Physical)',
-    material_type: '', number_of_copies: 1, cover_treatment: 'cv-navy',
+    material_type: '', number_of_copies: 1, cover_treatment: 'cv-blue',
   }
 }
 
@@ -101,7 +101,7 @@ function openEdit(book: Book) {
     format:           book.format ?? 'Book (Physical)',
     material_type:    book.material_type ?? '',
     number_of_copies: book.number_of_copies,
-    cover_treatment:  book.cover_treatment ?? 'cv-navy',
+    cover_treatment:  book.cover_treatment ?? 'cv-blue',
   })
   saveError.value = ''
   drawerOpen.value = true
@@ -201,14 +201,33 @@ function handleImportInput(e: Event) {
   if (input.files?.[0]) setImportFile(input.files[0])
 }
 
+const ACCEPTED_IMPORT = ['mrc', 'marc', 'xlsx', 'xls', 'xlsm', 'ods', 'csv', 'accdb', 'mdb']
+
 function setImportFile(file: File) {
   const ext = file.name.split('.').pop()?.toLowerCase()
-  if (!ext || !['mrc', 'marc'].includes(ext)) {
-    importError.value = 'Please select a binary MARC file (.mrc or .marc).'
+  if (!ext || !ACCEPTED_IMPORT.includes(ext)) {
+    importError.value = 'Unsupported file. Choose a MARC (.mrc, .marc), Excel (.xlsx, .xls, .csv), or Access (.accdb, .mdb) file.'
     return
   }
   importError.value = ''
   importFile.value  = file
+}
+
+function downloadTemplate() {
+  const headers = ['Title', 'Authors', 'ISBN', 'Publisher', 'Year', 'Edition', 'Subject', 'Call Number', 'Shelf', 'Language', 'Copies', 'Format']
+  const examples = [
+    ['Things Fall Apart', 'Chinua Achebe', '9780385474542', 'Anchor Books', '1994', '1st', 'African Literature', 'PR9387.9 A3', 'A-12', 'English', '3', 'Book (Physical)'],
+    ['Half of a Yellow Sun', 'Chimamanda Ngozi Adichie', '9780007200283', 'Knopf', '2006', '', 'Nigerian History', 'PR9387.9 A34', 'B-04', 'English', '2', 'Book (Physical)'],
+  ]
+  const esc = (v: string) => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+  const csv = [headers, ...examples].map(row => row.map(esc).join(',')).join('\r\n') + '\r\n'
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = 'catalog-import-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 async function runImport() {
@@ -225,6 +244,56 @@ async function runImport() {
   } catch (e: any) {
     importError.value = e.message
     importState.value = 'error'
+  }
+}
+
+// ── Copies / Accession numbers ───────────────────────────────────────────────
+interface CopyRow { copy_number: number; accession_number: string }
+
+const showCopies     = ref(false)
+const copiesBook     = ref<Book | null>(null)
+const copyRows       = ref<CopyRow[]>([])
+const copiesLoading  = ref(false)
+const copiesSaving   = ref(false)
+const copiesError    = ref('')
+
+async function openCopies(book: Book) {
+  copiesBook.value    = book
+  copyRows.value      = []
+  copiesError.value   = ''
+  copiesLoading.value = true
+  showCopies.value    = true
+  try {
+    const res = await apiGet<{ copies: { copy_number: number; accession_number: string | null }[] }>(
+      `/admin/books/${book.id}/copies`, auth.token!,
+    )
+    copyRows.value = res.copies.map(c => ({
+      copy_number: c.copy_number,
+      accession_number: c.accession_number ?? '',
+    }))
+  } catch (e: any) {
+    copiesError.value = e.message
+  } finally {
+    copiesLoading.value = false
+  }
+}
+
+async function saveCopies() {
+  if (!copiesBook.value) return
+  copiesSaving.value = true
+  copiesError.value  = ''
+  try {
+    await apiPut(`/admin/books/${copiesBook.value.id}/copies`, {
+      copies: copyRows.value.map(r => ({
+        copy_number: r.copy_number,
+        accession_number: r.accession_number.trim() || null,
+      })),
+    }, auth.token!)
+    showCopies.value = false
+  } catch (e: any) {
+    copiesError.value = e.message
+  } finally {
+    copiesSaving.value = false
   }
 }
 
@@ -267,7 +336,7 @@ onMounted(fetchBooks)
       <p>{{ total.toLocaleString() }} titles in the collection</p>
     </div>
     <div class="shead-actions">
-      <button class="btn btn-ghost" @click="openImportModal"><LucideIcon name="upload" class="ic-sm" /> Import MARC</button>
+      <button class="btn btn-ghost" @click="openImportModal"><LucideIcon name="upload" class="ic-sm" /> Import Records</button>
       <button class="btn btn-primary" @click="openAdd"><LucideIcon name="book-plus" class="ic-sm" /> Add New Title</button>
     </div>
   </div>
@@ -336,7 +405,7 @@ onMounted(fetchBooks)
         <tr v-else v-for="book in books" :key="book.id">
           <td>
             <div class="bookcell">
-              <div :class="['cover', book.cover_treatment ?? 'cv-navy']">
+              <div :class="['cover', book.cover_treatment ?? 'cv-blue']">
                 <div class="cover-top">
                   <div class="cover-rule"></div>
                   <div class="cover-t">{{ coverLabel(book.title) }}</div>
@@ -356,7 +425,7 @@ onMounted(fetchBooks)
           <td>
             <div class="rowacts" style="justify-content:flex-end">
               <div class="ra" title="Edit" @click="openEdit(book)"><LucideIcon name="pencil" /></div>
-              <div class="ra" title="Copies"><LucideIcon name="layers" /></div>
+              <div class="ra" title="Copies & Accession Numbers" @click="openCopies(book)"><LucideIcon name="layers" /></div>
               <div class="ra del" title="Delete" @click="promptDelete(book)"><LucideIcon name="trash-2" /></div>
             </div>
           </td>
@@ -508,6 +577,61 @@ onMounted(fetchBooks)
     </div>
   </div>
 
+  <!-- ── Copies / Accession Drawer ── -->
+  <div :class="['scrim', { open: showCopies }]" @click="showCopies = false"></div>
+  <div :class="['drawer', { open: showCopies }]">
+    <div class="dh">
+      <div>
+        <div class="dh-t">Copies &amp; Accession Numbers</div>
+        <div class="dh-s" v-if="copiesBook">{{ copiesBook.title }}</div>
+      </div>
+      <div class="dh-x" @click="showCopies = false"><LucideIcon name="x" /></div>
+    </div>
+
+    <div class="db">
+      <div class="db-sec">
+        <div class="db-sec-h">
+          <LucideIcon name="layers" /> {{ copyRows.length }} {{ copyRows.length === 1 ? 'Copy' : 'Copies' }}
+        </div>
+
+        <!-- Loading -->
+        <div v-if="copiesLoading" style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:18px 2px">
+          <LucideIcon name="refresh-cw" class="ic-sm" style="animation:spin .8s linear infinite" /> Loading copies…
+        </div>
+
+        <!-- Copy rows -->
+        <div v-else style="display:flex;flex-direction:column;gap:10px">
+          <div v-for="row in copyRows" :key="row.copy_number"
+            style="display:flex;align-items:center;gap:12px">
+            <div style="flex-shrink:0;width:78px;display:flex;align-items:center;gap:7px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:var(--blue-50);color:var(--blue);font-size:12px;font-weight:700">{{ row.copy_number }}</span>
+              <span style="font-size:12.5px;color:var(--muted);font-weight:600">Copy</span>
+            </div>
+            <input class="fi" style="flex:1" v-model="row.accession_number"
+              :placeholder="`Accession number for copy ${row.copy_number}`" />
+          </div>
+        </div>
+
+        <p style="font-size:12px;color:var(--faint);margin-top:12px">
+          The number of copies is set on the title's record. Edit the title to add or remove copies.
+        </p>
+      </div>
+
+      <div v-if="copiesError" style="color:var(--red);font-size:13px;margin-top:4px">
+        <LucideIcon name="alert-triangle" class="ic-sm" /> {{ copiesError }}
+      </div>
+    </div>
+
+    <div class="df">
+      <button class="btn btn-primary" style="flex:1;justify-content:center"
+        :disabled="copiesSaving || copiesLoading" @click="saveCopies">
+        <LucideIcon :name="copiesSaving ? 'refresh-cw' : 'save'" class="ic-sm" />
+        {{ copiesSaving ? 'Saving…' : 'Save Accession Numbers' }}
+      </button>
+      <button class="btn btn-ghost" @click="showCopies = false">Cancel</button>
+    </div>
+  </div>
+
   <!-- ── Modal: Saved ── -->
   <div :class="['mscrim', { open: showSavedModal }]" @click.self="showSavedModal = false">
     <div class="modal">
@@ -533,8 +657,8 @@ onMounted(fetchBooks)
     <div class="modal" style="max-width:520px">
       <div class="dh" style="padding:16px 22px">
         <div>
-          <div class="dh-t">Import MARC Records</div>
-          <div class="dh-s">Binary MARC 21 · ISO 2709 format · .mrc or .marc</div>
+          <div class="dh-t">Import Catalog Records</div>
+          <div class="dh-s">MARC 21 · Excel · Microsoft Access</div>
         </div>
         <div class="dh-x" @click="showImportModal = false"><LucideIcon name="x" /></div>
       </div>
@@ -553,15 +677,23 @@ onMounted(fetchBooks)
             @drop="handleImportDrop"
           >
             <div class="dz-ic"><LucideIcon name="upload" /></div>
-            <div class="dz-t" style="font-size:14px">Drop your MARC file here</div>
-            <div class="dz-s">or <b>browse</b> to select a .mrc / .marc file</div>
+            <div class="dz-t" style="font-size:14px">Drop your catalog file here</div>
+            <div class="dz-s">or <b>browse</b> — MARC, Excel, or Access</div>
             <div class="dz-formats" style="margin-top:10px">
-              <span class="tag">.mrc</span>
-              <span class="tag">.marc</span>
-              <span class="tag">ISO 2709</span>
+              <span class="tag">.mrc / .marc</span>
+              <span class="tag">.xlsx / .xls / .csv</span>
+              <span class="tag">.accdb / .mdb</span>
               <span class="tag">Up to 20 MB</span>
             </div>
-            <input ref="marcInput" type="file" accept=".mrc,.marc" style="display:none" @change="handleImportInput" />
+            <input ref="marcInput" type="file" accept=".mrc,.marc,.xlsx,.xls,.xlsm,.ods,.csv,.accdb,.mdb" style="display:none" @change="handleImportInput" />
+          </div>
+
+          <!-- Template helper (Excel/CSV/Access column guide) -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:9px 13px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r2)">
+            <span style="font-size:12px;color:var(--muted)">Not sure about the columns for Excel / Access?</span>
+            <button type="button" class="btn btn-ghost btn-sm" style="flex-shrink:0" @click.stop="downloadTemplate">
+              <LucideIcon name="download" class="ic-sm" /> Download template
+            </button>
           </div>
 
           <!-- Selected file chip -->
