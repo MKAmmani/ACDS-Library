@@ -460,8 +460,8 @@ onMounted(() => {
             <LucideIcon name="library" :size="22" class="text-white" />
           </span>
           <span>
-            <span class="block font-[var(--display)] text-sm lg:text-base font-bold text-[var(--navy)] leading-tight tracking-tight">Mudi Sipikin Library</span>
-            <span class="block text-[9px] lg:text-[10px] font-semibold tracking-[.09em] uppercase text-[var(--faint)] mt-0.5">Mambayya House · AKCDS</span>
+            <span class="block font-[var(--display)] text-sm lg:text-base font-bold text-red-500 leading-tight tracking-tight">Mambayya House · AKCDS</span>
+            <span class="block text-[9px] lg:text-[10px] font-semibold tracking-[.09em] uppercase text-[var(--faint)] mt-0.5">Mudi Sipikin Library</span>
           </span>
         </a>
 
@@ -931,8 +931,8 @@ onMounted(() => {
               <LucideIcon name="library" :size="19" class="text-white" />
             </span>
             <span>
-              <span class="block font-[var(--display)] text-[15px] font-bold text-white leading-tight">Mudi Sipikin Library</span>
-              <span class="block text-[10px] font-semibold tracking-[.09em] uppercase text-[var(--gold)] mt-1">Mambayya House · AKCDS</span>
+              <span class="block font-[var(--display)] text-[15px] font-bold text-red-500 leading-tight">Mambayya House · AKCDS</span>
+              <span class="block text-[10px] font-semibold tracking-[.09em] uppercase text-[var(--gold)] mt-1">Mudi Sipikin Library</span>
             </span>
           </div>
           <p class="text-[12.5px] leading-relaxed max-w-[320px]">

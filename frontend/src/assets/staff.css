@@ -97,7 +97,7 @@ input, select, textarea { font-family: var(--ui); }
 .sb-logo { width: 38px; height: 38px; border-radius: 9px; background: linear-gradient(150deg, var(--blue), var(--sky)); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; flex-shrink: 0; }
 .sb-logo::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--gold); }
 .sb-logo svg { color: #fff; width: 20px; height: 20px; }
-.sb-bname { font-family: var(--display); font-size: 14px; font-weight: 700; color: #fff; line-height: 1.15; }
+.sb-bname { font-family: var(--display); font-size: 14px; font-weight: 700; color: #ef4444; line-height: 1.15; }
 .sb-bsub { font-size: 9.5px; color: rgba(255,255,255,.4); letter-spacing: .04em; text-transform: uppercase; }
 .sb-role { margin: 11px 18px; padding: 6px 11px; background: rgba(242,165,12,.13); border: 1px solid rgba(242,165,12,.25); border-radius: var(--r); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); display: flex; align-items: center; gap: 7px; }
 .sb-role .dot { background: var(--gold); }
