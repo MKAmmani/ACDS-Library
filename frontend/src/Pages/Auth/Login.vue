@@ -18,7 +18,9 @@ async function handleLogin() {
   try {
     await auth.login(email.value, password.value)
 
-    if (auth.isStaff) {
+    if (auth.user?.role === 'admin') {
+      router.push('/admin/dashboard')
+    } else if (auth.user?.role === 'staff') {
       router.push('/staff/dashboard')
     } else {
       router.push('/user/my-account')
@@ -42,13 +44,13 @@ async function handleLogin() {
         </div>
         <div>
           <div class="auth-bname">Mambayya House</div>
-          <div class="auth-bsub">Library Management System</div>
+          <div class="auth-bsub">Library System</div>
         </div>
       </div>
 
       <!-- Heading -->
       <div class="auth-head">
-        <h1 class="auth-title">Welcome back</h1>
+        <h1 class="auth-title">Welcome</h1>
         <p class="auth-sub">Sign in to your account to continue</p>
       </div>
 
@@ -99,6 +101,16 @@ async function handleLogin() {
         </button>
       </form>
 
+      <!-- Guest access -->
+      <div style="display:flex;align-items:center;gap:12px;margin:22px 0 16px">
+        <div style="flex:1;height:1px;background:var(--line)"></div>
+        <span style="font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em">or</span>
+        <div style="flex:1;height:1px;background:var(--line)"></div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-block" @click="router.push('/user/catalog')">
+        <LucideIcon name="book-copy" class="ic-sm" /> Browse the Library
+      </button>
+
       <!-- Footer note -->
       <p class="auth-footer">
         Staff and members sign in here. Contact the library if you need an account.
@@ -110,13 +122,13 @@ async function handleLogin() {
     <div class="auth-panel">
       <div class="auth-panel-inner">
         <div class="auth-panel-icon"><LucideIcon name="book-open" :size="40" /></div>
-        <h2 class="auth-panel-title">ACDS Library<br />Back-Office</h2>
-        <p class="auth-panel-sub">Manage circulation, catalog, members, acquisitions, and reports — all in one place.</p>
+        <h2 class="auth-panel-title">ACDS Library</h2>
+        <p class="auth-panel-sub">One home for the catalog, digital repository, journals, and archives — for members and staff alike.</p>
         <div class="auth-panel-badges">
-          <span class="auth-pbadge"><LucideIcon name="check" :size="13" /> Circulation &amp; Loans</span>
-          <span class="auth-pbadge"><LucideIcon name="check" :size="13" /> Catalog Management</span>
-          <span class="auth-pbadge"><LucideIcon name="check" :size="13" /> Member Registry</span>
-          <span class="auth-pbadge"><LucideIcon name="check" :size="13" /> Reports &amp; Analytics</span>
+          <span class="auth-pbadge"><LucideIcon name="check" :size="13" /> Borrow &amp; Reserve Books</span>
+          <span class="auth-pbadge"><LucideIcon name="check" :size="13" /> Digital Repository &amp; Journals</span>
+          <span class="auth-pbadge"><LucideIcon name="check" :size="13" /> Ask-a-Librarian Support</span>
+          <span class="auth-pbadge"><LucideIcon name="check" :size="13" /> Track Loans &amp; Fines</span>
         </div>
       </div>
     </div>

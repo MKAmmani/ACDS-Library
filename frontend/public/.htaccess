@@ -1,0 +1,40 @@
+# This file is deployed to the SAME public_html as the Laravel backend's
+# public/ contents (index.php, backend assets, etc.) — it replaces both
+# apps' individual .htaccess and must handle routing for each of them.
+
+<IfModule mod_php.c>
+    php_value upload_max_filesize 1G
+    php_value post_max_size       1G
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Laravel backend routes -> Laravel's front controller
+    RewriteRule ^(api|sanctum|storage)(/|$) index.php [L]
+
+    # Real files/directories (built assets, favicon, Laravel's own files) -> serve as-is
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Everything else -> the Vue SPA entry point
+    RewriteRule ^ index.html [L]
+</IfModule>

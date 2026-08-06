@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Acquisition;
+use App\Models\Book;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -11,7 +12,7 @@ class AcquisitionController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Acquisition::with('user:id,name');
+        $query = Acquisition::with(['user:id,name', 'book:id,title']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -31,6 +32,10 @@ class AcquisitionController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if ($request->user()->isAdmin()) {
+            return response()->json(['message' => 'Only staff can submit acquisition requests.'], 403);
+        }
+
         $data = $request->validate([
             'title'          => ['required', 'string', 'max:255'],
             'authors'        => ['nullable', 'string', 'max:255'],
@@ -58,6 +63,15 @@ class AcquisitionController extends Controller
             'notes'          => ['nullable', 'string'],
         ]);
 
+        // Approving or declining a pending request is an administrator-only decision.
+        $isApprovalDecision = ($data['status'] ?? null) !== null
+            && in_array($data['status'], ['ordered', 'declined'], true)
+            && $acquisition->status === 'awaiting';
+
+        if ($isApprovalDecision && ! $request->user()->isAdmin()) {
+            return response()->json(['message' => 'Only an administrator can approve or decline acquisition requests.'], 403);
+        }
+
         $acquisition->update($data);
 
         return response()->json($acquisition->fresh()->load('user:id,name'));
@@ -68,5 +82,37 @@ class AcquisitionController extends Controller
         $acquisition->delete();
 
         return response()->json(['message' => 'Acquisition request deleted.']);
+    }
+
+    /**
+     * Turn a received acquisition into a catalog entry — creates the Book
+     * record from the request's details and links it back to this request.
+     */
+    public function catalog(Request $request, Acquisition $acquisition): JsonResponse
+    {
+        if ($request->user()->isAdmin()) {
+            return response()->json(['message' => 'Only staff can catalog received acquisitions.'], 403);
+        }
+
+        if ($acquisition->status !== 'received') {
+            return response()->json(['message' => 'Only received acquisitions can be catalogued.'], 422);
+        }
+
+        if ($acquisition->book_id) {
+            return response()->json(['message' => 'This acquisition has already been catalogued.'], 422);
+        }
+
+        $book = Book::create([
+            'title'             => $acquisition->title,
+            'authors'           => $acquisition->authors,
+            'subject_area'      => 'General',
+            'language'          => 'English',
+            'number_of_copies'  => $acquisition->copies,
+            'available_copies'  => $acquisition->copies,
+        ]);
+
+        $acquisition->update(['book_id' => $book->id]);
+
+        return response()->json($acquisition->fresh()->load(['user:id,name', 'book']));
     }
 }

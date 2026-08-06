@@ -66,7 +66,7 @@ class InstitutionalRepositoryController extends Controller
     {
         $data = $request->validate([
             'title'          => ['required', 'string', 'max:255'],
-            'authors'        => ['required', 'string', 'max:255'],
+            'authors'        => ['nullable', 'string', 'max:255'],
             'publisher'      => ['nullable', 'string', 'max:255'],
             'year'           => ['nullable', 'integer', 'min:1000', 'max:' . date('Y')],
             'isbn'           => ['nullable', 'string', 'max:20'],
@@ -86,7 +86,7 @@ class InstitutionalRepositoryController extends Controller
         }
 
         $uploaded = $request->file('file');
-        $data['file_path'] = $uploaded->store('repositories', 'local');
+        $data['file_path'] = $uploaded->store('repositories', 's3');
         $data['file_size'] = $uploaded->getSize();
         $data['file_type'] = strtolower($uploaded->getClientOriginalExtension());
 
@@ -123,10 +123,10 @@ class InstitutionalRepositoryController extends Controller
 
         if ($request->hasFile('file')) {
             if ($institutionalRepository->file_path) {
-                Storage::disk('local')->delete($institutionalRepository->file_path);
+                Storage::disk('s3')->delete($institutionalRepository->file_path);
             }
             $uploaded = $request->file('file');
-            $data['file_path'] = $uploaded->store('repositories', 'local');
+            $data['file_path'] = $uploaded->store('repositories', 's3');
             $data['file_size'] = $uploaded->getSize();
             $data['file_type'] = strtolower($uploaded->getClientOriginalExtension());
         }
@@ -145,7 +145,7 @@ class InstitutionalRepositoryController extends Controller
         }
 
         if ($institutionalRepository->file_path) {
-            Storage::disk('local')->delete($institutionalRepository->file_path);
+            Storage::disk('s3')->delete($institutionalRepository->file_path);
         }
 
         $institutionalRepository->delete();
@@ -153,32 +153,61 @@ class InstitutionalRepositoryController extends Controller
         return response()->json(['message' => 'Repository item deleted successfully.']);
     }
 
-    public function read(InstitutionalRepository $institutionalRepository): \Symfony\Component\HttpFoundation\BinaryFileResponse|JsonResponse
+    public function read(InstitutionalRepository $institutionalRepository): StreamedResponse|JsonResponse
     {
-        if (! $institutionalRepository->file_path || ! Storage::disk('local')->exists($institutionalRepository->file_path)) {
+        if (! $institutionalRepository->file_path || ! Storage::disk('s3')->exists($institutionalRepository->file_path)) {
             return response()->json(['message' => 'No file available for this repository item.'], 404);
         }
 
-        $fullPath = Storage::disk('local')->path($institutionalRepository->file_path);
-        $ext      = strtolower($institutionalRepository->file_type ?? pathinfo($fullPath, PATHINFO_EXTENSION));
+        $ext = strtolower($institutionalRepository->file_type ?? pathinfo($institutionalRepository->file_path, PATHINFO_EXTENSION));
 
         $mime = match ($ext) {
             'pdf'  => 'application/pdf',
             'epub' => 'application/epub+zip',
             'doc'  => 'application/msword',
             'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            default => mime_content_type($fullPath) ?: 'application/octet-stream',
+            default => 'application/octet-stream',
         };
 
-        return response()->file($fullPath, [
-            'Content-Type'        => $mime,
-            'Content-Disposition' => 'inline; filename="' . rawurlencode($institutionalRepository->title . '.' . $ext) . '"',
+        return Storage::disk('s3')->response(
+            $institutionalRepository->file_path,
+            $institutionalRepository->title . '.' . $ext,
+            ['Content-Type' => $mime],
+            'inline'
+        );
+    }
+
+    /**
+     * Return the file as base64 inside a JSON envelope. Because the response is
+     * application/json (not application/pdf), download managers such as IDM do
+     * not intercept it — the browser-side reader decodes it to a blob locally.
+     */
+    public function inline(InstitutionalRepository $institutionalRepository): JsonResponse
+    {
+        if (! $institutionalRepository->file_path || ! Storage::disk('s3')->exists($institutionalRepository->file_path)) {
+            return response()->json(['message' => 'No file available for this repository item.'], 404);
+        }
+
+        $ext = strtolower($institutionalRepository->file_type ?? pathinfo($institutionalRepository->file_path, PATHINFO_EXTENSION));
+
+        $mime = match ($ext) {
+            'pdf'  => 'application/pdf',
+            'epub' => 'application/epub+zip',
+            'doc'  => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            default => 'application/octet-stream',
+        };
+
+        return response()->json([
+            'mime' => $mime,
+            'name' => $institutionalRepository->title . '.' . $ext,
+            'data' => base64_encode(Storage::disk('s3')->get($institutionalRepository->file_path)),
         ]);
     }
 
     public function download(InstitutionalRepository $institutionalRepository): StreamedResponse|JsonResponse
     {
-        if (! $institutionalRepository->file_path || ! Storage::disk('local')->exists($institutionalRepository->file_path)) {
+        if (! $institutionalRepository->file_path || ! Storage::disk('s3')->exists($institutionalRepository->file_path)) {
             return response()->json(['message' => 'No file available for this repository item.'], 404);
         }
 
@@ -190,7 +219,7 @@ class InstitutionalRepositoryController extends Controller
         $ext = $institutionalRepository->file_type
             ?? pathinfo($institutionalRepository->file_path, PATHINFO_EXTENSION);
 
-        return Storage::disk('local')->download(
+        return Storage::disk('s3')->download(
             $institutionalRepository->file_path,
             $institutionalRepository->title . '.' . $ext
         );

@@ -9,15 +9,15 @@ const loading = ref(true)
 const error   = ref('')
 
 const policies = ref<any[]>([])
-const activeType = ref('student')
+const activeType = ref('pg_student')
 const saving  = ref(false)
 const saved   = ref(false)
 
 const TYPES = [
-  { key: 'student', label: 'Student' },
-  { key: 'staff',   label: 'Staff' },
-  { key: 'faculty', label: 'Faculty' },
-  { key: 'public',  label: 'Public' },
+  { key: 'buk_staff',                label: 'BUK Staff' },
+  { key: 'pg_student',               label: 'PG Student' },
+  { key: 'independent_researcher',   label: 'Independent Researcher' },
+  { key: 'international_researcher', label: 'International Researcher' },
 ]
 
 // Editable fields per policy (keyed by membership_type)
@@ -29,6 +29,10 @@ function currentPolicy() {
 
 function editFor(type: string) {
   return edits.value[type] ?? {}
+}
+
+function typeLabel(type: string) {
+  return TYPES.find(t => t.key === type)?.label ?? type
 }
 
 async function load() {
@@ -171,7 +175,7 @@ onMounted(load)
           </thead>
           <tbody>
             <tr v-for="p in policies" :key="p.id" :style="p.membership_type === activeType ? 'background:var(--blue-50)' : ''">
-              <td style="font-weight:600;text-transform:capitalize">{{ p.membership_type }}</td>
+              <td style="font-weight:600">{{ typeLabel(p.membership_type) }}</td>
               <td>{{ p.loan_days }}</td>
               <td>{{ p.max_books }}</td>
               <td>{{ parseFloat(p.fine_per_day).toFixed(2) }}</td>

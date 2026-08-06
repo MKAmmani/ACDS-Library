@@ -26,6 +26,8 @@ class Book extends Model
         'number_of_copies',
         'available_copies',
         'cover_treatment',
+        'is_archived',
+        'archive_reason',
     ];
 
     protected function casts(): array
@@ -34,6 +36,7 @@ class Book extends Model
             'year'             => 'integer',
             'number_of_copies' => 'integer',
             'available_copies' => 'integer',
+            'is_archived'      => 'boolean',
         ];
     }
 

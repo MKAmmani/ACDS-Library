@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import LucideIcon from '@/components/LucideIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet } from '@/api/http'
+import { renderAsync } from 'docx-preview'
 
 const auth = useAuthStore()
 
@@ -18,9 +19,24 @@ const currentPage   = ref(1)
 const lastPage      = ref(1)
 const total         = ref(0)
 const downloading    = ref<number | null>(null)
+const reading        = ref<number | null>(null)
 const showReader     = ref(false)
 const readerUrl      = ref('')
 const readerTitle    = ref('')
+const readerMode     = ref<'pdf' | 'docx' | 'unsupported'>('pdf')
+const readerLoading  = ref(false)
+const readerError    = ref('')
+const readerBlobUrl  = ref('')
+const readerDoc      = ref<any>(null)
+const docxHost       = ref<HTMLElement | null>(null)
+
+function fileKind(item: any): 'pdf' | 'img' | 'docx' | 'other' {
+  const t = (item.file_type ?? '').toLowerCase()
+  if (t === 'pdf') return 'pdf'
+  if (t === 'docx') return 'docx'
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(t)) return 'img'
+  return 'other'
+}
 
 const formats = ['All', 'eBook', 'Report', 'Thesis', 'Policy Brief']
 const topics  = ['All', 'Democracy', 'Governance', 'Electoral', 'History', 'Law', 'Civil Society']
@@ -82,19 +98,70 @@ function formatFileSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function readOnline(item: any) {
-  // Point the iframe directly at the public /read endpoint. The backend serves
-  // the file inline (Content-Disposition: inline), so the browser's native PDF
-  // viewer renders it. No fetch/blob — that would require CORS read access; an
-  // iframe just displaying a cross-origin PDF does not.
-  readerUrl.value   = `${BASE_URL}/repository/${item.id}/read`
+async function readOnline(item: any) {
+  const kind = fileKind(item)
+  readerDoc.value   = item
   readerTitle.value = item.title
-  showReader.value  = true
+  readerError.value = ''
+  revokeReaderBlob()
+  readerUrl.value = ''
+
+  const isDocx = kind === 'docx'
+  const previewable = kind === 'pdf' || kind === 'img' || isDocx
+  if (!previewable) {
+    readerMode.value = 'unsupported'
+    showReader.value = true
+    return
+  }
+
+  readerMode.value    = isDocx ? 'docx' : 'pdf'
+  readerLoading.value = true
+  reading.value       = item.id
+  showReader.value    = true
+
+  try {
+    const headers: Record<string, string> = {}
+    if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`
+    // base64 JSON envelope — avoids download-manager (IDM) interception of PDFs.
+    const res = await fetch(`${BASE_URL}/repository/${item.id}/inline`, { headers })
+    if (!res.ok) throw new Error('Could not load the document.')
+    const json = await res.json()
+    const blob = await (await fetch(`data:${json.mime};base64,${json.data}`)).blob()
+
+    if (isDocx) {
+      const buffer = await blob.arrayBuffer()
+      await nextTick()
+      if (docxHost.value) {
+        docxHost.value.innerHTML = ''
+        await renderAsync(buffer, docxHost.value, undefined, {
+          className: 'docx', inWrapper: true, ignoreWidth: false,
+        })
+      }
+    } else {
+      readerBlobUrl.value = URL.createObjectURL(blob)
+      readerUrl.value     = readerBlobUrl.value
+    }
+  } catch (e: any) {
+    readerError.value = e.message ?? 'Could not display the document.'
+  } finally {
+    readerLoading.value = false
+    reading.value = null
+  }
+}
+
+function revokeReaderBlob() {
+  if (readerBlobUrl.value) {
+    URL.revokeObjectURL(readerBlobUrl.value)
+    readerBlobUrl.value = ''
+  }
 }
 
 function closeReader() {
-  showReader.value = false
-  readerUrl.value  = ''
+  showReader.value  = false
+  readerUrl.value   = ''
+  readerError.value = ''
+  revokeReaderBlob()
+  if (docxHost.value) docxHost.value.innerHTML = ''
 }
 
 async function downloadItem(item: any) {
@@ -229,8 +296,11 @@ const pages = computed(() => {
             <span v-if="res.file_size">· {{ formatFileSize(res.file_size) }}</span>
           </div>
           <div class="flex gap-2">
-            <button class="flex-1 btn btn-primary btn-sm" :disabled="!res.file_path" @click="readOnline(res)">
-              <LucideIcon name="book-open" :size="14" /> Read Online
+            <button class="flex-1 btn btn-primary btn-sm"
+              :disabled="!res.file_path || reading === res.id" @click="readOnline(res)">
+              <LucideIcon :name="reading===res.id ? 'loader' : 'book-open'" :size="14"
+                :class="reading===res.id ? 'animate-spin' : ''" />
+              {{ reading === res.id ? 'Opening…' : 'Read Online' }}
             </button>
             <button class="btn btn-ghost btn-sm" :disabled="!res.file_path || !auth.token || downloading === res.id"
               @click="downloadItem(res)">
@@ -286,17 +356,52 @@ const pages = computed(() => {
       <div class="flex items-center justify-between gap-4 px-5 py-3 bg-white border-b border-[var(--line)] flex-shrink-0">
         <div class="text-[13.5px] font-semibold text-[var(--navy)] truncate">{{ readerTitle }}</div>
         <div class="flex items-center gap-2 flex-shrink-0">
-          <a :href="readerUrl" target="_blank"
+          <a v-if="readerMode === 'pdf' && readerUrl" :href="readerUrl" target="_blank"
             class="btn btn-ghost btn-sm flex items-center gap-1.5 text-[12.5px]">
             <LucideIcon name="external-link" :size="14" /> Open in tab
           </a>
+          <button v-if="readerDoc" class="btn btn-ghost btn-sm flex items-center gap-1.5 text-[12.5px]"
+            :disabled="!auth.token || downloading === readerDoc.id" @click="downloadItem(readerDoc)">
+            <LucideIcon name="download" :size="14" /> Download
+          </button>
           <button class="w-8 h-8 flex items-center justify-center rounded-md border border-[var(--line)] text-[var(--muted)] hover:bg-[var(--bg)]"
             @click="closeReader">
             <LucideIcon name="x" :size="16" />
           </button>
         </div>
       </div>
-      <iframe :src="readerUrl" class="flex-1 w-full border-none bg-white" allow="fullscreen"></iframe>
+
+      <!-- PDF / image -->
+      <div v-if="readerMode === 'pdf'" class="flex-1 relative" style="background:#525659">
+        <div v-if="readerLoading" class="absolute inset-0 flex items-center justify-center gap-2.5 text-white text-[14px]">
+          <LucideIcon name="loader" :size="18" class="animate-spin" /> Loading document…
+        </div>
+        <div v-else-if="readerError" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white text-[14px] px-6 text-center">
+          <LucideIcon name="alert-triangle" :size="22" /> {{ readerError }}
+        </div>
+        <iframe v-if="readerUrl" :src="readerUrl" class="w-full h-full border-none" allow="fullscreen"></iframe>
+      </div>
+
+      <!-- DOCX -->
+      <div v-else-if="readerMode === 'docx'" class="flex-1 overflow-auto relative" style="background:#f3f3f3">
+        <div v-if="readerLoading" class="absolute inset-0 flex items-center justify-center gap-2.5 text-[var(--muted)] text-[14px]">
+          <LucideIcon name="loader" :size="18" class="animate-spin" /> Rendering document…
+        </div>
+        <div v-if="readerError" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[var(--red)] text-[14px] px-6 text-center">
+          <LucideIcon name="alert-triangle" :size="22" /> {{ readerError }}
+        </div>
+        <div ref="docxHost" class="py-6"></div>
+      </div>
+
+      <!-- Unsupported -->
+      <div v-else class="flex-1 flex flex-col items-center justify-center gap-3.5 bg-white px-8 text-center">
+        <LucideIcon name="file-text" :size="46" class="text-[var(--faint)]" />
+        <div class="text-[15px] font-semibold text-[var(--navy)]">This file type can't be previewed in the browser</div>
+        <div class="text-[13px] text-[var(--muted)] max-w-[380px]">Legacy Word (.doc) and EPUB files have no built-in browser viewer. Download the file to open it on your device.</div>
+        <button v-if="readerDoc" class="btn btn-primary btn-sm mt-1" :disabled="!auth.token || downloading === readerDoc.id" @click="downloadItem(readerDoc)">
+          <LucideIcon name="download" :size="14" /> Download file
+        </button>
+      </div>
     </div>
   </Teleport>
 </template>

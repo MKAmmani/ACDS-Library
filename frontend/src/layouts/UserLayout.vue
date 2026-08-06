@@ -30,10 +30,12 @@ const memberLabel = computed(() => {
 
 const navItems = computed(() => [
   { section: 'Library' },
-  { id: 'catalog',    label: 'Catalog',           icon: 'book-copy',          path: '/user/catalog' },
-  { id: 'e-library',  label: 'E-Library',          icon: 'monitor',            path: '/user/e-library' },
+  { id: 'catalog',    label: 'Browse Library',    icon: 'book-copy',          path: '/user/catalog' },
+  { id: 'e-library',  label: 'Institutional Repository', icon: 'monitor',       path: '/user/e-library' },
+  { id: 'media',      label: 'Media Library',      icon: 'video',              path: '/user/media' },
   { id: 'journals',   label: 'Journals',           icon: 'newspaper',          path: '/user/journals' },
   { id: 'archives',   label: 'Archives',           icon: 'archive',            path: '/user/archives' },
+  { id: 'news',       label: 'News & Events',      icon: 'bell',               path: '/user/news' },
   { section: 'My Space' },
   { id: 'my-account', label: 'My Account',         icon: 'layout-dashboard',   path: '/user/my-account' },
   { id: 'help',       label: 'Ask-Librarian',      icon: 'message-circle',     path: '/user/help',
@@ -46,6 +48,7 @@ const pageTitle = computed(() => route.meta.title as string ?? 'Member Portal')
 function isActive(path: string) { return route.path === path }
 
 onMounted(async () => {
+  if (!auth.token) return   // guests browse without loading account data
   try {
     profile.value = await apiGet<any>('/auth/me', auth.token ?? undefined)
     // Count threads where staff has replied (unread for user = last_sender_role is staff/admin)
@@ -56,6 +59,10 @@ onMounted(async () => {
     ).length
   } catch {}
 })
+
+function goSignIn() {
+  router.push({ path: '/auth/login', query: { redirect: route.path } })
+}
 
 async function handleLogout() {
   await auth.logout()
@@ -81,8 +88,11 @@ async function handleLogout() {
         </div>
       </div>
 
-      <div class="sb-role" style="background:rgba(14,159,110,.13);border-color:rgba(14,159,110,.25);color:var(--green)">
+      <div v-if="auth.isLoggedIn" class="sb-role" style="background:rgba(14,159,110,.13);border-color:rgba(14,159,110,.25);color:var(--green)">
         <span class="dot" style="background:var(--green)"></span> Member Access
+      </div>
+      <div v-else class="sb-role" style="background:rgba(23,99,201,.1);border-color:rgba(23,99,201,.22);color:var(--blue)">
+        <span class="dot" style="background:var(--blue)"></span> Browsing as Guest
       </div>
 
       <nav class="sb-nav">
@@ -101,14 +111,19 @@ async function handleLogout() {
       </nav>
 
       <div class="sb-foot">
-        <div class="sb-av" style="background:linear-gradient(140deg,var(--green-600),#0dd891)">{{ initials }}</div>
-        <div style="min-width:0">
-          <div class="sb-uname">{{ profile?.name ?? auth.user?.name ?? 'Member' }}</div>
-          <div class="sb-urole">{{ memberLabel }}</div>
-        </div>
-        <div class="sb-out" title="Sign out" @click="handleLogout">
-          <LucideIcon name="log-out" class="ic-sm" />
-        </div>
+        <template v-if="auth.isLoggedIn">
+          <div class="sb-av" style="background:linear-gradient(140deg,var(--green-600),#0dd891)">{{ initials }}</div>
+          <div style="min-width:0">
+            <div class="sb-uname">{{ profile?.name ?? auth.user?.name ?? 'Member' }}</div>
+            <div class="sb-urole">{{ memberLabel }}</div>
+          </div>
+          <div class="sb-out" title="Sign out" @click="handleLogout">
+            <LucideIcon name="log-out" class="ic-sm" />
+          </div>
+        </template>
+        <button v-else class="btn btn-primary btn-block" style="justify-content:center" @click="goSignIn">
+          <LucideIcon name="log-in" class="ic-sm" /> Sign in
+        </button>
       </div>
     </aside>
 

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import LucideIcon from '@/components/LucideIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPost } from '@/api/http'
 
-const auth = useAuthStore()
+const auth   = useAuthStore()
+const router = useRouter()
+const route  = useRoute()
 
 // ── UI state ─────────────────────────────────────────────────────────────────
 const searchQuery  = ref('')
@@ -31,30 +34,52 @@ const total       = ref(0)
 const reserving     = ref(false)
 const reserveError  = ref('')
 const reservationId = ref('')
+const reservedIds   = ref<Set<number>>(new Set())   // books the current user has already reserved
+
+const isLoggedIn = computed(() => !!auth.token)
+
+// When a search has been run and produced results, hide Browse Collections
+// and the filter sidebar so only the results show under the search bar.
+const isSearchingResults = computed(() => !!searchQuery.value.trim() && !loading.value && books.value.length > 0)
+function isReserved(book: any) { return reservedIds.value.has(book.id) }
+
+function goSignIn() {
+  router.push({ path: '/auth/login', query: { redirect: route.path } })
+}
 
 // ── Filters ──────────────────────────────────────────────────────────────────
+const DEFAULT_YEAR_FROM = 1900
+const DEFAULT_YEAR_TO   = new Date().getFullYear()
+
 const filters = reactive({
   format:       [] as string[],
   subject:      [] as string[],
   availability: [] as string[],
-  yearFrom: 1900,
-  yearTo:   new Date().getFullYear(),
+  yearFrom: DEFAULT_YEAR_FROM,
+  yearTo:   DEFAULT_YEAR_TO,
 })
 
-const collections = [
-  { id:'all',       label:'All Books',          icon:'book-copy',  cls:'text-[var(--blue)]',  subject: null,         search: null },
-  { id:'electoral', label:'Electoral Studies',  icon:'vote',       cls:'text-[var(--blue)]',  subject: 'Electoral',  search: null },
-  { id:'aminu',     label:'Aminu Kano',          icon:'user-round', cls:'text-[#A23B50]',      subject: null,         search: 'Aminu Kano' },
-  { id:'africa',    label:'African Democracy',   icon:'globe',      cls:'text-[var(--green)]', subject: 'African',    search: null },
-  { id:'law',       label:'Constitutional Law',  icon:'scale',      cls:'text-[var(--sky)]',   subject: 'Law',        search: null },
-  { id:'history',   label:'History',             icon:'scroll',     cls:'text-[#C07D0A]',      subject: 'History',    search: null },
-]
+// Dynamic facets loaded from the backend (reflect what staff have catalogued)
+const subjectFacets = ref<{ name: string; count: number }[]>([])
+const shelfFacets    = ref<{ name: string; count: number }[]>([])
 
-const filterGroups = [
-  { label:'Format',       key:'format'       as const, opts:[['Books'],['Journals'],['Theses'],['eBooks']] },
-  { label:'Subject',      key:'subject'      as const, opts:[['Democracy & Governance'],['Nigerian History'],['Political Science'],['African Studies']] },
-  { label:'Availability', key:'availability' as const, opts:[['Available Now'],['On Loan']] },
-]
+// Browse Collections — built from the books' shelf locations
+const collections = computed(() => [
+  { id: 'all', label: 'All Books', icon: 'book-copy', cls: 'text-[var(--blue)]', shelf: null as string | null },
+  ...shelfFacets.value.map(s => ({
+    id: 'shelf:' + s.name,
+    label: s.name,
+    icon: 'map-pin',
+    cls: 'text-[var(--blue)]',
+    shelf: s.name as string | null,
+  })),
+])
+
+const filterGroups = computed(() => [
+  { label: 'Format',       key: 'format'       as const, opts: ['Books', 'Journals', 'Theses'] },
+  { label: 'Subject',      key: 'subject'      as const, opts: subjectFacets.value.map(s => s.name) },
+  { label: 'Availability', key: 'availability' as const, opts: ['Available Now', 'On Loan'] },
+])
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const coverClasses = ['cv-navy','cv-burgundy','cv-forest','cv-charcoal','cv-slate','cv-ochre','cv-rust']
@@ -79,6 +104,7 @@ function dotCls(s: string) {
 const activeFilters = computed(() => [
   ...filters.format.map(v => ({ label: v, type: 'format' })),
   ...filters.subject.map(v => ({ label: v, type: 'subject' })),
+  ...filters.availability.map(v => ({ label: v, type: 'availability' })),
 ])
 
 function toggleFilter(type: keyof typeof filters, val: string) {
@@ -91,6 +117,7 @@ function removeFilter(type: string, label: string) {
 }
 function clearFilters() {
   filters.format = []; filters.subject = []; filters.availability = []
+  filters.yearFrom = DEFAULT_YEAR_FROM; filters.yearTo = DEFAULT_YEAR_TO
   activeColl.value = 'all'
   fetchBooks()
 }
@@ -117,23 +144,33 @@ async function fetchBooks() {
       params.set('search', searchQuery.value.trim())
     }
 
-    // Collection shortcut (subject_area or search term)
-    const col = collections.find(c => c.id === activeColl.value)
-    if (col) {
-      if (col.subject && !searchQuery.value.trim()) params.set('subject_area', col.subject)
-      if (col.search  && !searchQuery.value.trim()) params.set('search', col.search)
-    }
+    // Browse Collections shortcut → shelf location
+    const col = collections.value.find(c => c.id === activeColl.value)
+    if (col?.shelf) params.set('shelf_location', col.shelf)
 
-    // Subject filter (sidebar)
-    if (filters.subject.length && !params.has('subject_area')) {
-      params.set('subject_area', filters.subject[0].replace(' & ', ' ').replace('Nigerian History', 'History'))
+    // Subject filter (sidebar) — dynamic exact subjects, supports multi-select
+    if (filters.subject.length) {
+      params.set('subject_area', filters.subject.join(','))
     }
 
     // Format filter
     if (filters.format.length) {
-      const fmtMap: Record<string,string> = { Books:'book', Journals:'journal', Theses:'thesis', eBooks:'ebook' }
-      params.set('format', fmtMap[filters.format[0]] ?? filters.format[0].toLowerCase())
+      const fmtMap: Record<string,string> = { Books:'book', Journals:'journal', Theses:'thesis' }
+      const [firstFormat] = filters.format
+      if (firstFormat) params.set('format', fmtMap[firstFormat] ?? firstFormat.toLowerCase())
     }
+
+    // Availability filter — only meaningful when exactly one is chosen
+    if (filters.availability.length === 1) {
+      params.set('availability', filters.availability[0] === 'Available Now' ? 'available' : 'on_loan')
+    }
+
+    // Year range filter — only sent once the user has moved off the full default range
+    if (filters.yearFrom !== DEFAULT_YEAR_FROM) params.set('year_from', String(filters.yearFrom))
+    if (filters.yearTo   !== DEFAULT_YEAR_TO)   params.set('year_to',   String(filters.yearTo))
+
+    // Archived titles are in special storage, not on the open shelves
+    params.set('archived', '0')
 
     params.set('page', String(currentPage.value))
 
@@ -166,7 +203,47 @@ const pagesArr = computed(() => {
   return [...set].sort((a, b) => a - b)
 })
 
-onMounted(fetchBooks)
+async function fetchFacets() {
+  try {
+    const f = await apiGet<any>('/books/facets')
+    subjectFacets.value = f.subjects        ?? []
+    shelfFacets.value   = f.shelf_locations ?? []
+  } catch {}
+}
+
+// Which books the signed-in member already has an active reservation for —
+// so we can show them as "Reserved" instead of erroring on a duplicate request.
+async function fetchMyReservations() {
+  if (!auth.token) return
+  try {
+    const res  = await apiGet<any>('/me/reservations', auth.token)
+    const list = res.data ?? []
+    reservedIds.value = new Set(
+      list
+        .filter((r: any) => ['pending', 'fulfilled'].includes(r.status))
+        .map((r: any) => r.book?.id ?? r.book_id),
+    )
+  } catch {}
+}
+
+// Deep-linked search — e.g. /user/catalog?search=… from the landing page's
+// New Arrivals, Featured Collections or hero search bar.
+onMounted(() => {
+  const q = route.query.search
+  if (typeof q === 'string' && q.trim()) searchQuery.value = q
+  fetchFacets(); fetchBooks(); fetchMyReservations()
+})
+
+// Same route, new query (e.g. clicking a different collection card while
+// already on the catalog page) — Vue Router reuses the component, so this
+// won't re-run via onMounted.
+watch(() => route.query.search, (q) => {
+  const next = typeof q === 'string' ? q : ''
+  if (next === searchQuery.value) return
+  searchQuery.value = next
+  currentPage.value = 1
+  fetchBooks()
+})
 
 // Re-fetch when filter sidebar changes
 watch(() => [filters.format.join(), filters.subject.join(), filters.availability.join()], () => {
@@ -182,6 +259,16 @@ function closeDrawer()         { drawerOpen.value = false }
 function openReserve(book?: any) {
   if (book) selectedBook.value = book
   if (!selectedBook.value) return
+  // Reserving requires an account — send guests to sign in first.
+  if (!auth.token) { goSignIn(); return }
+  // Already reserved this book → just show the reserved confirmation.
+  if (isReserved(selectedBook.value)) {
+    reservationId.value = ''
+    reserveStep.value   = 2
+    reserveError.value  = ''
+    modalOpen.value     = true
+    return
+  }
   reserveStep.value  = 1
   reserveError.value = ''
   reservationId.value = ''
@@ -193,7 +280,7 @@ async function confirmReserve() {
   if (!selectedBook.value) return
 
   if (!auth.token) {
-    reserveError.value = 'Please log in to reserve a book.'
+    reserveError.value = 'Please sign in to reserve a book.'
     return
   }
 
@@ -202,11 +289,25 @@ async function confirmReserve() {
   try {
     const res = await apiPost<any>('/reservations', { book_id: selectedBook.value.id }, auth.token)
     reservationId.value = `RES-${String(res.id).padStart(4, '0')}`
+    markReserved(selectedBook.value.id)
     reserveStep.value   = 2
   } catch (e: any) {
-    reserveError.value = e.message
+    // An existing reservation isn't an error — treat the book as already reserved.
+    if (/already have an active reservation/i.test(e.message ?? '')) {
+      markReserved(selectedBook.value.id)
+      reservationId.value = ''
+      reserveStep.value   = 2
+    } else {
+      reserveError.value = e.message
+    }
   }
   reserving.value = false
+}
+
+function markReserved(id: number) {
+  const next = new Set(reservedIds.value)
+  next.add(id)
+  reservedIds.value = next
 }
 
 // ── Cite ──────────────────────────────────────────────────────────────────────
@@ -287,7 +388,7 @@ function copyCite() {
     </div>
 
     <!-- Mobile filter toggle -->
-    <button class="lg:hidden flex items-center justify-between w-full btn btn-ghost mb-4" @click="showFilters = !showFilters">
+    <button v-if="!isSearchingResults" class="lg:hidden flex items-center justify-between w-full btn btn-ghost mb-4" @click="showFilters = !showFilters">
       <span class="flex items-center gap-2">
         <LucideIcon name="sliders-horizontal" :size="15" /> Filters
         <span v-if="activeFilters.length" class="text-[11px] bg-[var(--blue)] text-white rounded-full w-5 h-5 flex items-center justify-center">{{ activeFilters.length }}</span>
@@ -295,10 +396,10 @@ function copyCite() {
       <LucideIcon :name="showFilters ? 'chevron-up' : 'chevron-down'" :size="15" />
     </button>
 
-    <div class="catalog-grid">
+    <div :class="['catalog-grid', isSearchingResults ? 'no-sidebar' : '']">
 
       <!-- Filter sidebar -->
-      <aside :class="['bg-white border border-[var(--line)] rounded-xl overflow-hidden lg:sticky lg:top-[6rem]', showFilters ? 'block' : 'hidden lg:block']"
+      <aside v-if="!isSearchingResults" :class="['bg-white border border-[var(--line)] rounded-xl overflow-hidden lg:sticky lg:top-[6rem]', showFilters ? 'block' : 'hidden lg:block']"
         style="box-shadow:var(--sh1)">
         <div class="px-4 py-3.5 border-b border-[var(--line)] flex items-center justify-between">
           <h3 class="text-[12px] font-bold tracking-[.08em] uppercase text-[var(--navy)] flex items-center gap-2">
@@ -311,7 +412,7 @@ function copyCite() {
             {{ g.label }} <LucideIcon name="chevron-down" :size="13" class="text-[var(--faint)]" />
           </div>
           <div class="flex flex-col gap-2">
-            <label v-for="opt in g.opts.map(o => o[0]!)" :key="opt" class="flex items-center gap-2 cursor-pointer group">
+            <label v-for="opt in g.opts" :key="opt" class="flex items-center gap-2 cursor-pointer group">
               <span :class="['w-4 h-4 border-[1.75px] rounded border-[var(--line)] flex items-center justify-center transition-all flex-shrink-0 group-hover:border-[var(--blue)]',
                 (filters[g.key] as string[]).includes(opt) ? '!bg-[var(--blue)] !border-[var(--blue)]' : '']"
                 @click="toggleFilter(g.key, opt)">
@@ -323,12 +424,14 @@ function copyCite() {
         </div>
         <div class="px-4 py-4">
           <div class="text-[11px] font-bold tracking-[.07em] uppercase text-[var(--ink)] mb-3">Year</div>
-          <div class="flex items-center gap-2">
-            <input v-model.number="filters.yearFrom" type="number"
-              class="flex-1 text-[12.5px] px-2.5 py-2 border-[1.5px] border-[var(--line)] rounded-md outline-none text-[var(--ink)] focus:border-[var(--blue)]" />
-            <span class="text-[var(--faint)]">–</span>
-            <input v-model.number="filters.yearTo" type="number"
-              class="flex-1 text-[12.5px] px-2.5 py-2 border-[1.5px] border-[var(--line)] rounded-md outline-none text-[var(--ink)] focus:border-[var(--blue)]" />
+          <div class="flex items-center gap-1.5">
+            <input v-model.number="filters.yearFrom" type="number" inputmode="numeric"
+              @change="currentPage=1; fetchBooks()"
+              class="year-input min-w-0 flex-1 text-[12.5px] px-1.5 py-2 border-[1.5px] border-[var(--line)] rounded-md outline-none text-[var(--ink)] focus:border-[var(--blue)]" />
+            <span class="text-[var(--faint)] flex-shrink-0">–</span>
+            <input v-model.number="filters.yearTo" type="number" inputmode="numeric"
+              @change="currentPage=1; fetchBooks()"
+              class="year-input min-w-0 flex-1 text-[12.5px] px-1.5 py-2 border-[1.5px] border-[var(--line)] rounded-md outline-none text-[var(--ink)] focus:border-[var(--blue)]" />
           </div>
         </div>
       </aside>
@@ -336,7 +439,7 @@ function copyCite() {
       <!-- Main content -->
       <div class="min-w-0">
         <!-- Collections -->
-        <div class="mb-5">
+        <div v-if="!isSearchingResults" class="mb-5">
           <div class="flex items-center justify-between mb-3">
             <h2 class="text-[15px] sm:text-[16px] font-bold text-[var(--navy)] flex items-center gap-2" style="font-family:var(--display)">
               <LucideIcon name="sparkles" :size="17" class="text-[var(--gold)]" /> Browse Collections
@@ -422,7 +525,11 @@ function copyCite() {
               </div>
             </div>
             <div class="px-3 py-2.5 border-t border-[var(--line-soft)] flex gap-2">
-              <button v-if="bookStatus(book)==='available'"
+              <button v-if="isReserved(book)" disabled
+                class="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold py-2 rounded-md border-[1.5px] border-[var(--green)] bg-[var(--green-50)] text-[var(--green-600)] cursor-default">
+                <LucideIcon name="bookmark-check" :size="13" /> Reserved
+              </button>
+              <button v-else-if="bookStatus(book)==='available'"
                 class="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold py-2 rounded-md border-[1.5px] border-[var(--blue)] bg-[var(--blue)] text-white hover:bg-[var(--blue-700)] transition-all"
                 @click.stop="openReserve(book)">
                 <LucideIcon name="bookmark" :size="13" /> Reserve
@@ -484,7 +591,11 @@ function copyCite() {
                 <div class="text-[11.5px] text-[var(--muted)] font-mono">{{ book.call_number }}</div>
                 <div class="text-[12px] text-[var(--muted)]">{{ book.year }}</div>
                 <div class="flex gap-1.5">
-                  <button :class="['text-[11px] font-semibold px-2.5 py-[5px] rounded-md border-[1.5px] transition-all',
+                  <button v-if="isReserved(book)" disabled
+                    class="text-[11px] font-semibold px-2.5 py-[5px] rounded-md border-[1.5px] border-[var(--green)] bg-[var(--green-50)] text-[var(--green-600)] cursor-default">
+                    Reserved
+                  </button>
+                  <button v-else :class="['text-[11px] font-semibold px-2.5 py-[5px] rounded-md border-[1.5px] transition-all',
                     bookStatus(book)==='available' ? 'bg-[var(--blue)] text-white border-[var(--blue)] hover:bg-[var(--blue-700)]' : 'border-[var(--line)] text-[var(--muted)] hover:border-[var(--blue)] hover:text-[var(--blue)]']"
                     @click.stop="openReserve(book)">
                     {{ bookStatus(book)==='available' ? 'Reserve' : bookStatus(book)==='digital' ? 'Read' : 'Queue' }}
@@ -717,12 +828,14 @@ function copyCite() {
               <LucideIcon name="check" :size="28" class="text-[var(--green)]" />
             </div>
             <div class="text-[19px] font-bold text-[var(--navy)] text-center mb-2" style="font-family:var(--display)">
-              Reservation Confirmed
+              {{ reservationId ? 'Reservation Confirmed' : 'Already Reserved' }}
             </div>
             <p class="text-[13.5px] text-[var(--muted)] text-center font-light mb-5">
-              {{ selectedBook && bookStatus(selectedBook) === 'available'
-                  ? 'Your hold has been placed. Visit the library desk within 48 hours to collect this book.'
-                  : 'You are on the waitlist. You will be notified when this book becomes available.' }}
+              {{ !reservationId
+                  ? 'You already have an active reservation for this book. Check “My Account” to view it.'
+                  : (selectedBook && bookStatus(selectedBook) === 'available'
+                      ? 'Your hold has been placed. Visit the library desk within 48 hours to collect this book.'
+                      : 'You are on the waitlist. You will be notified when this book becomes available.') }}
             </p>
             <div v-if="reservationId" class="bg-[var(--bg)] border border-[var(--line)] rounded-[10px] p-4 flex flex-col gap-2.5">
               <div class="flex justify-between items-center">
@@ -760,6 +873,14 @@ function copyCite() {
 </template>
 
 <style scoped>
+.year-input {
+  -moz-appearance: textfield;
+}
+.year-input::-webkit-outer-spin-button,
+.year-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 .catalog-grid {
   display: grid;
   gap: 1.5rem;
@@ -768,6 +889,7 @@ function copyCite() {
 }
 @media (min-width: 1024px) {
   .catalog-grid { grid-template-columns: 248px 1fr; }
+  .catalog-grid.no-sidebar { grid-template-columns: 1fr; }
 }
 .book-grid {
   display: grid;

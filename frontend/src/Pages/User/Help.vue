@@ -115,6 +115,10 @@ async function sendReply() {
 
 async function submitAsk() {
   if (!message.value.trim()) return
+  if (!auth.token) {
+    sendError.value = 'Please sign in to send a message to the librarian.'
+    return
+  }
   sending.value   = true
   sendError.value = ''
   try {
@@ -144,6 +148,7 @@ function switchToThreads() {
 }
 
 onMounted(() => {
+  if (!auth.token) return   // guests can read the page and use the ask form (sign-in gated)
   loadThreads()
   listPollTimer = setInterval(() => {
     if (!document.hidden) loadThreads(true)

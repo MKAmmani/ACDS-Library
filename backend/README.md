@@ -7,6 +7,47 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Institutional Repository File Storage (Cloudflare R2)
+
+### Background
+
+Institutional repository files (PDFs/eBooks served at `/api/repository/{id}/read`, `/inline`, `/download`) were originally stored on the production server's local disk (`storage/app/private/repositories`). This caused files to work for a short period after upload and then start 404ing, even though the database row for the item was intact. Root cause: the app is deployed to shared hosting via zip re-upload, and locally-stored files are not tracked in git — a redeploy (or hosting-side cleanup/quota limits) overwrites or wipes anything uploaded after the last zip was built. The database only stores the `file_path` string; it has no bearing on whether the physical file still exists on disk.
+
+Fix: repository files are now stored on **Cloudflare R2** (S3-compatible object storage) instead of the local disk, decoupling file lifecycle from server deploys entirely.
+
+### What changed in code
+
+- Installed `league/flysystem-aws-s3-v3` (required for Laravel's S3-compatible driver).
+- `App\Http\Controllers\Api\InstitutionalRepositoryController` now reads/writes/deletes files via `Storage::disk('s3')` instead of `Storage::disk('local')`.
+- `read()`, `inline()`, and `download()` now stream the file from R2 (`->response()`, `->get()`, `->download()`) instead of resolving a local filesystem path — object storage has no real local path.
+- `cover_image` uploads are unaffected — those remain on the local `public` disk.
+
+### One-time setup (per environment)
+
+1. In the Cloudflare dashboard: **R2 → create a bucket**, then **R2 → Manage API Tokens → create a token** with read/write access to that bucket. This gives you an Access Key ID, Secret Access Key, and your Account ID.
+2. Set the following in that environment's `.env` (see `.env.example` for placeholders):
+
+   ```
+   AWS_ACCESS_KEY_ID=<your key>
+   AWS_SECRET_ACCESS_KEY=<your secret>
+   AWS_DEFAULT_REGION=auto
+   AWS_BUCKET=<your bucket name>
+   AWS_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com
+   AWS_USE_PATH_STYLE_ENDPOINT=true
+   ```
+
+   `AWS_USE_PATH_STYLE_ENDPOINT=true` is a hard requirement for R2, not optional — R2 doesn't support virtual-hosted-style bucket addressing the way AWS S3 does.
+
+3. Deploy the code, then run `php artisan config:clear` (production caches config, so new env vars won't be picked up until cleared).
+4. Run `php artisan repository:migrate-to-r2` once to copy any files still present on the server's local disk to R2 before fully cutting over — anything already wiped can't be recovered by this command, only what's still there.
+
+### Migration command reference
+
+`php artisan repository:migrate-to-r2` — iterates every `institutional_repositories` row with a `file_path`, and for each one:
+- Skips it if the file already exists on R2.
+- Copies it from the local disk to R2 if found locally.
+- Warns and skips if the file exists on neither disk (already lost).
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

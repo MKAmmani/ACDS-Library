@@ -34,16 +34,6 @@ const userInitials = computed(() => {
   return name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 })
 
-const roleDisplay = computed(() => {
-  if (auth.user?.role === 'admin')  return 'Chief Librarian'
-  if (auth.user?.role === 'staff')  return 'Librarian'
-  return 'Staff'
-})
-
-const consoleLabel = computed(() => {
-  return auth.user?.role === 'admin' ? 'Admin Console' : 'Librarian Console'
-})
-
 const navItems = computed<NavItem[]>(() => [
   { section: 'Operations' },
   { id: 'dashboard',   label: 'Dashboard',           icon: 'layout-dashboard',     path: '/staff/dashboard' },
@@ -52,14 +42,13 @@ const navItems = computed<NavItem[]>(() => [
   { id: 'overdue',     label: 'Overdue & Fines',     icon: 'alarm-clock',          path: '/staff/overdue',     badge: overdueCount.value || undefined,     badgeClass: 'bg-red' },
   { section: 'Catalog' },
   { id: 'catalog',     label: 'Catalog Manager',     icon: 'book-copy',            path: '/staff/catalog' },
-  { id: 'repository',  label: 'Digital Repository',  icon: 'upload',               path: '/staff/repository' },
+  { id: 'repository',  label: 'Institutional Repository',  icon: 'upload',          path: '/staff/repository' },
+  { id: 'media',       label: 'Media Library',       icon: 'video',                path: '/staff/media' },
   { id: 'acquisition', label: 'Acquisitions',        icon: 'truck',                path: '/staff/acquisition' },
   { section: 'People' },
-  { id: 'users',       label: 'Members',             icon: 'users-round',          path: '/staff/users' },
-  { id: 'inbox',       label: 'Ask-Librarian Inbox', icon: 'message-square-text',  path: '/staff/inbox',       badge: inboxUnread.value || undefined, badgeClass: 'bg-red' },
+  { id: 'inbox',       label: 'Inbox',               icon: 'message-square-text',  path: '/staff/inbox',       badge: inboxUnread.value || undefined, badgeClass: 'bg-red' },
   { section: 'Insights' },
   { id: 'reports',     label: 'Reports',             icon: 'chart-no-axes-column', path: '/staff/reports' },
-  { id: 'settings',    label: 'Settings',            icon: 'settings',             path: '/staff/settings' },
 ])
 
 const pageTitle = computed(() => route.meta.title as string ?? 'Staff Panel')
@@ -102,7 +91,7 @@ async function handleLogout() {
       </div>
 
       <div class="sb-role">
-        <span class="dot"></span> {{ consoleLabel }}
+        <span class="dot"></span> Librarian Console
       </div>
 
       <nav class="sb-nav">
@@ -120,13 +109,13 @@ async function handleLogout() {
         </template>
       </nav>
 
-      <div class="sb-foot">
+      <div class="sb-foot" style="cursor:pointer" title="My Profile" @click="navigate('/staff/profile')">
         <div class="sb-av">{{ userInitials }}</div>
         <div>
           <div class="sb-uname">{{ auth.user?.name ?? 'Librarian' }}</div>
-          <div class="sb-urole">{{ roleDisplay }}</div>
+          <div class="sb-urole">Librarian</div>
         </div>
-        <div class="sb-out" title="Sign out" @click="handleLogout">
+        <div class="sb-out" title="Sign out" @click.stop="handleLogout">
           <LucideIcon name="log-out" class="ic-sm" />
         </div>
       </div>

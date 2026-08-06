@@ -14,6 +14,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(LoanPolicySeeder::class);
+        $this->call(MediaSeeder::class);
+        $this->call(NewsPostSeeder::class);
+        $this->call(EventSeeder::class);
+        $this->call(OpeningHourSeeder::class);
 
         // Super admin — full system oversight, manages staff accounts
         User::firstOrCreate(

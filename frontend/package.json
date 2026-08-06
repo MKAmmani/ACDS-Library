@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "build": "run-s type-check build-only",
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "docx-preview": "^0.3.7",
     "pinia": "^3.0.4",
     "vue": "beta",
     "vue-router": "^5.0.4"

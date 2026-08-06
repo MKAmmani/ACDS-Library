@@ -30,7 +30,7 @@ export async function apiPost<T>(path: string, body: unknown, token?: string): P
   if (res.status === 401) { handle401(); throw new Error(data?.message ?? 'Unauthorized.') }
   if (!res.ok) {
     const firstError =
-      data?.errors ? Object.values(data.errors as Record<string, string[]>)[0][0] : data?.message
+      data?.errors ? Object.values(data.errors as Record<string, string[]>)[0]?.[0] : data?.message
     throw new Error(firstError ?? 'Something went wrong.')
   }
 
@@ -67,7 +67,7 @@ export async function apiPatch<T>(path: string, body: unknown, token?: string): 
   if (res.status === 401) { handle401(); throw new Error(data?.message ?? 'Unauthorized.') }
   if (!res.ok) {
     const firstError =
-      data?.errors ? Object.values(data.errors as Record<string, string[]>)[0][0] : data?.message
+      data?.errors ? Object.values(data.errors as Record<string, string[]>)[0]?.[0] : data?.message
     throw new Error(firstError ?? 'Something went wrong.')
   }
 
@@ -92,7 +92,7 @@ export async function apiPut<T>(path: string, body: unknown, token?: string): Pr
   if (res.status === 401) { handle401(); throw new Error(data?.message ?? 'Unauthorized.') }
   if (!res.ok) {
     const firstError =
-      data?.errors ? Object.values(data.errors as Record<string, string[]>)[0][0] : data?.message
+      data?.errors ? Object.values(data.errors as Record<string, string[]>)[0]?.[0] : data?.message
     throw new Error(firstError ?? 'Something went wrong.')
   }
 
@@ -110,7 +110,7 @@ export async function apiUpload<T>(path: string, formData: FormData, token?: str
   if (res.status === 401) { handle401(); throw new Error(data?.message ?? 'Unauthorized.') }
   if (!res.ok) {
     const firstError =
-      data?.errors ? Object.values(data.errors as Record<string, string[]>)[0][0] : data?.message
+      data?.errors ? Object.values(data.errors as Record<string, string[]>)[0]?.[0] : data?.message
     throw new Error(firstError ?? 'Something went wrong.')
   }
 

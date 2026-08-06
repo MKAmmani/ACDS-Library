@@ -85,6 +85,19 @@ async function updateStatus(acq: any, status: string) {
   }
 }
 
+async function catalogIt(acq: any) {
+  processingId.value = acq.id
+  try {
+    const updated = await apiPost<any>(`/admin/acquisitions/${acq.id}/catalog`, {}, auth.token ?? undefined)
+    const idx = acquisitions.value.findIndex((a: any) => a.id === acq.id)
+    if (idx >= 0) acquisitions.value[idx] = updated
+  } catch (e: any) {
+    alert(e.message)
+  } finally {
+    processingId.value = null
+  }
+}
+
 async function deleteAcq(acq: any) {
   if (!confirm(`Delete acquisition request for "${acq.title}"?`)) return
   processingId.value = acq.id
@@ -167,8 +180,7 @@ onMounted(load)
             <div class="rowacts" style="justify-content:flex-end">
               <!-- Awaiting -->
               <template v-if="acq.status === 'awaiting'">
-                <button class="btn btn-green btn-sm" :disabled="processingId === acq.id" @click="updateStatus(acq, 'ordered')">Approve</button>
-                <button class="btn btn-danger btn-sm" :disabled="processingId === acq.id" @click="updateStatus(acq, 'declined')">Decline</button>
+                <span class="badge b-gold">Awaiting Admin Approval</span>
               </template>
               <!-- Ordered -->
               <template v-else-if="acq.status === 'ordered'">
@@ -176,7 +188,13 @@ onMounted(load)
               </template>
               <!-- Received -->
               <template v-else-if="acq.status === 'received'">
-                <button class="btn btn-primary btn-sm" @click="router.push('/staff/catalog')">Catalog It</button>
+                <span v-if="acq.book_id" class="badge b-green" style="cursor:pointer" title="View in Catalog" @click="router.push('/staff/catalog')">
+                  <LucideIcon name="check" class="ic-sm" /> Logged
+                </span>
+                <button
+                  v-else class="btn btn-primary btn-sm"
+                  :disabled="processingId === acq.id" @click="catalogIt(acq)"
+                >{{ processingId === acq.id ? 'Cataloging…' : 'Catalog It' }}</button>
               </template>
               <!-- Declined -->
               <template v-else>

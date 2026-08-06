@@ -3,9 +3,10 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPost, apiPatch } from '@/api/http'
 import LucideIcon from '@/components/LucideIcon.vue'
+import Users from './Users.vue'
 
 const auth      = useAuthStore()
-const activeTab = ref<'issue' | 'return' | 'renew'>('issue')
+const activeTab = ref<'issue' | 'return' | 'renew' | 'members'>('issue')
 
 // ── Member search ──
 const memberQuery   = ref('')
@@ -206,7 +207,7 @@ function loanBadge(loan: any) {
   return 'b-red'
 }
 
-function switchTab(tab: 'issue' | 'return' | 'renew') {
+function switchTab(tab: 'issue' | 'return' | 'renew' | 'members') {
   activeTab.value = tab
 }
 </script>
@@ -218,12 +219,16 @@ function switchTab(tab: 'issue' | 'return' | 'renew') {
       <p>Issue, return, and renew books at the front desk</p>
     </div>
     <div class="fbtns">
-      <div :class="['fbtn', { on: activeTab === 'issue' }]"  @click="switchTab('issue')">Issue</div>
-      <div :class="['fbtn', { on: activeTab === 'return' }]" @click="switchTab('return')">Return</div>
-      <div :class="['fbtn', { on: activeTab === 'renew' }]"  @click="switchTab('renew')">Renew</div>
+      <div :class="['fbtn', { on: activeTab === 'issue' }]"   @click="switchTab('issue')">Issue</div>
+      <div :class="['fbtn', { on: activeTab === 'return' }]"  @click="switchTab('return')">Return</div>
+      <div :class="['fbtn', { on: activeTab === 'renew' }]"   @click="switchTab('renew')">Renew</div>
+      <div :class="['fbtn', { on: activeTab === 'members' }]" @click="switchTab('members')">Members</div>
     </div>
   </div>
 
+  <Users v-if="activeTab === 'members'" />
+
+  <template v-else>
   <div class="circ-grid">
     <!-- Step 1: Member -->
     <div class="circ-panel">
@@ -518,6 +523,7 @@ function switchTab(tab: 'issue' | 'return' | 'renew') {
       </tbody>
     </table>
   </div>
+  </template>
 
   <!-- Issue success modal -->
   <div :class="['mscrim', { open: showIssueModal }]" @click.self="showIssueModal = false">

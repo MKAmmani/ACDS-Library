@@ -4,13 +4,17 @@ use App\Http\Controllers\Api\AcquisitionController;
 use App\Http\Controllers\Api\InboxController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookController;
+use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\FineController;
 use App\Http\Controllers\Api\InstitutionalRepositoryController;
 use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\LoanPolicyController;
 use App\Http\Controllers\Api\MarcImportController;
+use App\Http\Controllers\Api\NewsPostController;
+use App\Http\Controllers\Api\OpeningHourController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReservationController;
+use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,12 +24,21 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 Route::get('/books',        [BookController::class, 'index']);
+Route::get('/books/facets', [BookController::class, 'facets']);
 Route::get('/books/{book}', [BookController::class, 'show']);
 
 Route::get('/repository',                                [InstitutionalRepositoryController::class, 'index']);
 Route::get('/repository/stats',                          [InstitutionalRepositoryController::class, 'stats']);
 Route::get('/repository/{institutionalRepository}',      [InstitutionalRepositoryController::class, 'show']);
-Route::get('/repository/{institutionalRepository}/read', [InstitutionalRepositoryController::class, 'read']);
+Route::get('/repository/{institutionalRepository}/read',   [InstitutionalRepositoryController::class, 'read']);
+Route::get('/repository/{institutionalRepository}/inline', [InstitutionalRepositoryController::class, 'inline']);
+
+// Landing-page content — media (video/audio), news, events, opening hours
+Route::get('/media',                 [MediaController::class, 'index']);
+Route::get('/media/{medium}/stream', [MediaController::class, 'stream']);
+Route::get('/news',          [NewsPostController::class, 'index']);
+Route::get('/events',        [EventController::class, 'index']);
+Route::get('/opening-hours', [OpeningHourController::class, 'index']);
 
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login',    [AuthController::class, 'login']);
@@ -117,15 +130,38 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/acquisitions',                [AcquisitionController::class, 'index']);
         Route::post('/acquisitions',               [AcquisitionController::class, 'store']);
         Route::patch('/acquisitions/{acquisition}', [AcquisitionController::class, 'update']);
+        Route::post('/acquisitions/{acquisition}/catalog', [AcquisitionController::class, 'catalog']);
         Route::delete('/acquisitions/{acquisition}', [AcquisitionController::class, 'destroy']);
 
         // Users
+        Route::get('/users/stats',                  [UserController::class, 'stats']);
         Route::get('/users',                        [UserController::class, 'index']);
+        Route::post('/users',                       [UserController::class, 'store']);
         Route::get('/users/{user}',                 [UserController::class, 'show']);
+        Route::patch('/users/{user}',               [UserController::class, 'update']);
         Route::patch('/users/{user}/role',          [UserController::class, 'updateRole']);
         Route::patch('/users/{user}/active',        [UserController::class, 'toggleActive']);
         Route::patch('/users/{user}/membership',    [UserController::class, 'updateMembership']);
         Route::delete('/users/{user}',              [UserController::class, 'destroy']);
+
+        // Website content — landing page media (video/audio), news, events & opening hours
+        Route::post('/media',               [MediaController::class, 'store']);
+        // POST, not PATCH — the update carries a multipart file upload (like
+        // /admin/repository/{id}), and apiUpload() on the frontend always POSTs.
+        Route::post('/media/{medium}',      [MediaController::class, 'update']);
+        Route::delete('/media/{medium}',    [MediaController::class, 'destroy']);
+
+        Route::post('/news',                [NewsPostController::class, 'store']);
+        Route::patch('/news/{newsPost}',    [NewsPostController::class, 'update']);
+        Route::delete('/news/{newsPost}',   [NewsPostController::class, 'destroy']);
+
+        Route::post('/events',              [EventController::class, 'store']);
+        Route::patch('/events/{event}',     [EventController::class, 'update']);
+        Route::delete('/events/{event}',    [EventController::class, 'destroy']);
+
+        Route::post('/opening-hours',                    [OpeningHourController::class, 'store']);
+        Route::patch('/opening-hours/{openingHour}',      [OpeningHourController::class, 'update']);
+        Route::delete('/opening-hours/{openingHour}',     [OpeningHourController::class, 'destroy']);
     });
 });
 

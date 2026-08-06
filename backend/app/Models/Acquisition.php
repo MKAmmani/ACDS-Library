@@ -8,7 +8,7 @@ class Acquisition extends Model
 {
     protected $fillable = [
         'title', 'authors', 'requested_by', 'estimated_cost',
-        'copies', 'status', 'notes', 'user_id',
+        'copies', 'status', 'notes', 'user_id', 'book_id',
     ];
 
     protected function casts(): array
@@ -22,5 +22,10 @@ class Acquisition extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function book()
+    {
+        return $this->belongsTo(Book::class);
     }
 }

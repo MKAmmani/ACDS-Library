@@ -37,12 +37,73 @@ class BookController extends Controller
         }
 
         if ($request->filled('subject_area')) {
-            $query->where('subject_area', 'like', '%' . $request->subject_area . '%');
+            $query->whereIn('subject_area', explode(',', $request->subject_area));
         }
 
-        return response()->json(
-            $query->orderBy('title')->paginate(20)
-        );
+        if ($request->filled('shelf_location')) {
+            $query->where('shelf_location', $request->shelf_location);
+        }
+
+        if ($request->filled('availability')) {
+            if ($request->availability === 'available') {
+                $query->where('available_copies', '>', 0);
+            } elseif ($request->availability === 'on_loan') {
+                $query->where('available_copies', '<=', 0);
+            }
+        }
+
+        if ($request->filled('year_from')) {
+            $query->where('year', '>=', (int) $request->year_from);
+        }
+
+        if ($request->filled('year_to')) {
+            $query->where('year', '<=', (int) $request->year_to);
+        }
+
+        // Only applied when explicitly requested — the Staff/Admin Catalog Manager
+        // never sends this, so it keeps seeing every book regardless of archive status.
+        if ($request->has('archived')) {
+            $query->where('is_archived', $request->boolean('archived'));
+        }
+
+        if ($request->filled('archive_reason')) {
+            $query->where('archive_reason', $request->archive_reason);
+        }
+
+        if ($request->input('sort') === 'newest') {
+            $query->orderByDesc('created_at')->orderByDesc('id');
+        } else {
+            $query->orderBy('title');
+        }
+
+        $perPage = $request->filled('per_page') ? min((int) $request->per_page, 50) : 20;
+
+        return response()->json($query->paginate($perPage));
+    }
+
+    /**
+     * Distinct facet values for the catalog filters — subjects (for the Subject
+     * filter) and shelf locations (for Browse Collections), ordered by how many
+     * books carry each, so the most-used appear first.
+     */
+    public function facets(): JsonResponse
+    {
+        $subjects = Book::query()
+            ->whereNotNull('subject_area')->where('subject_area', '!=', '')
+            ->selectRaw('subject_area as name, COUNT(*) as count')
+            ->groupBy('subject_area')->orderByDesc('count')->orderBy('subject_area')
+            ->limit(30)->get();
+
+        $shelves = Book::query()
+            ->whereNotNull('shelf_location')->where('shelf_location', '!=', '')
+            ->selectRaw('shelf_location as name, COUNT(*) as count')
+            ->groupBy('shelf_location')->orderByDesc('count')->orderBy('shelf_location')
+            ->limit(20)->get();
+
+        return response()->json([
+            'subjects'        => $subjects,
+            'shelf_locations' => $shelves,
+        ]);
     }
 
     public function show(Book $book): JsonResponse
@@ -54,13 +115,13 @@ class BookController extends Controller
     {
         $data = $request->validate([
             'title'           => ['required', 'string', 'max:255'],
-            'authors'         => ['required', 'string', 'max:255'],
+            'authors'         => ['nullable', 'string', 'max:255'],
             'publisher'       => ['nullable', 'string', 'max:255'],
             'year'            => ['nullable', 'integer', 'min:1000', 'max:' . date('Y')],
             'isbn'            => ['nullable', 'string', 'max:20', 'unique:books,isbn'],
             'edition'         => ['nullable', 'string', 'max:50'],
             'description'     => ['nullable', 'string'],
-            'subject_area'    => ['required', 'string', 'max:255'],
+            'subject_area'    => ['nullable', 'string', 'max:255'],
             'call_number'     => ['nullable', 'string', 'max:50'],
             'shelf_location'  => ['nullable', 'string', 'max:100'],
             'language'        => ['nullable', 'string', 'max:50'],
@@ -68,9 +129,13 @@ class BookController extends Controller
             'material_type'   => ['nullable', 'string', 'max:50'],
             'number_of_copies' => ['nullable', 'integer', 'min:0'],
             'cover_treatment' => ['nullable', 'string', 'max:100'],
+            'is_archived'     => ['nullable', 'boolean'],
+            'archive_reason'  => ['nullable', 'string', 'max:255'],
         ]);
 
         $data['available_copies'] = $data['number_of_copies'] ?? 1;
+        $data['subject_area']     = $data['subject_area'] ?? 'General';
+        $data['language']         = $data['language'] ?? 'English';
 
         return response()->json(Book::create($data), 201);
     }
@@ -79,13 +144,13 @@ class BookController extends Controller
     {
         $data = $request->validate([
             'title'           => ['sometimes', 'string', 'max:255'],
-            'authors'         => ['sometimes', 'string', 'max:255'],
+            'authors'         => ['nullable', 'string', 'max:255'],
             'publisher'       => ['nullable', 'string', 'max:255'],
             'year'            => ['nullable', 'integer', 'min:1000', 'max:' . date('Y')],
             'isbn'            => ['nullable', 'string', 'max:20', 'unique:books,isbn,' . $book->id],
             'edition'         => ['nullable', 'string', 'max:50'],
             'description'     => ['nullable', 'string'],
-            'subject_area'    => ['sometimes', 'string', 'max:255'],
+            'subject_area'    => ['nullable', 'string', 'max:255'],
             'call_number'     => ['nullable', 'string', 'max:50'],
             'shelf_location'  => ['nullable', 'string', 'max:100'],
             'language'        => ['nullable', 'string', 'max:50'],
@@ -93,6 +158,8 @@ class BookController extends Controller
             'material_type'   => ['nullable', 'string', 'max:50'],
             'number_of_copies' => ['nullable', 'integer', 'min:0'],
             'cover_treatment' => ['nullable', 'string', 'max:100'],
+            'is_archived'     => ['nullable', 'boolean'],
+            'archive_reason'  => ['nullable', 'string', 'max:255'],
         ]);
 
         // Keep available_copies in sync when total copies change
