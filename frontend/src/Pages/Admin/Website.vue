@@ -25,17 +25,30 @@ const items    = ref<any[]>([])
 const loading  = ref(true)
 const error    = ref('')
 
+// Counts shown in the KPI row — independent of which tab is active.
+const counts = ref<Record<TabKey, number>>({ news: 0, events: 0, hours: 0 })
+
 async function load() {
   loading.value = true
   error.value   = ''
   try {
     const res = await apiGet<any>(ENDPOINTS[activeTab.value].list, auth.token ?? undefined)
     items.value = res?.data ?? []
+    counts.value[activeTab.value] = items.value.length
   } catch (e: any) {
     error.value = e.message
   } finally {
     loading.value = false
   }
+}
+
+async function loadCounts() {
+  await Promise.all((Object.keys(ENDPOINTS) as TabKey[]).map(async (tab) => {
+    try {
+      const res = await apiGet<any>(ENDPOINTS[tab].list, auth.token ?? undefined)
+      counts.value[tab] = (res?.data ?? []).length
+    } catch { /* non-blocking */ }
+  }))
 }
 
 function switchTab(tab: TabKey) {
@@ -105,7 +118,8 @@ async function save() {
     } else {
       await apiPost<any>(base, payload, auth.token ?? undefined)
     }
-    drawerOpen.value = false
+    drawerOpen.value    = false
+    showSavedModal.value = true
     await load()
   } catch (e: any) {
     saveError.value = e.message
@@ -136,7 +150,12 @@ function fmtDate(d: string | null) {
 
 const tabTitle = computed(() => TABS.find(t => t.key === activeTab.value)?.label ?? '')
 
-onMounted(load)
+const sectionIcon: Record<TabKey, string> = { news: 'newspaper', events: 'calendar', hours: 'clock' }
+
+// Confirmation shown once after a successful add/edit.
+const showSavedModal = ref(false)
+
+onMounted(() => { load(); loadCounts() })
 </script>
 
 <template>
@@ -145,21 +164,49 @@ onMounted(load)
       <h2>Website Content</h2>
       <p>Manage the news, events &amp; opening hours shown on the public landing page — videos have their own page</p>
     </div>
-  </div>
-
-  <!-- Tabs -->
-  <div class="fbtns" style="margin-bottom:18px">
-    <div v-for="t in TABS" :key="t.key" :class="['fbtn', { on: activeTab === t.key }]" @click="switchTab(t.key)">
-      <LucideIcon :name="t.icon" class="ic-sm" style="margin-right:5px" />{{ t.label }}
+    <div class="shead-actions">
+      <button class="btn btn-ghost" @click="load">
+        <LucideIcon name="refresh-cw" class="ic-sm" /> Refresh
+      </button>
+      <button class="btn btn-primary" @click="openAdd">
+        <LucideIcon name="plus" class="ic-sm" /> Add {{ tabTitle.replace(/s$/, '') }}
+      </button>
     </div>
   </div>
 
-  <div class="toolbar" style="margin-bottom:16px">
-    <button class="btn btn-primary btn-sm" @click="openAdd">
-      <LucideIcon name="plus" class="ic-sm" /> Add {{ tabTitle.replace(/s$/, '') }}
-    </button>
-    <button class="btn btn-ghost btn-sm" @click="load">
-      <LucideIcon name="refresh-cw" class="ic-sm" /> Refresh
+  <!-- KPIs -->
+  <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi">
+      <div class="kpi-top">
+        <div class="kpi-n">{{ counts.news }}</div>
+        <div class="kpi-ic t-blue"><LucideIcon name="newspaper" /></div>
+      </div>
+      <div class="kpi-l">News Posts</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-top">
+        <div class="kpi-n">{{ counts.events }}</div>
+        <div class="kpi-ic t-gold"><LucideIcon name="calendar" /></div>
+      </div>
+      <div class="kpi-l">Events Listed</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-top">
+        <div class="kpi-n">{{ counts.hours }}</div>
+        <div class="kpi-ic t-slate"><LucideIcon name="clock" /></div>
+      </div>
+      <div class="kpi-l">Opening Hours Entries</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button
+      v-for="t in TABS" :key="t.key"
+      :class="['tab-btn', { active: activeTab === t.key }]"
+      @click="switchTab(t.key)"
+    >
+      <LucideIcon :name="t.icon" class="ic-sm" />{{ t.label }}
     </button>
   </div>
 
@@ -246,6 +293,7 @@ onMounted(load)
     <div class="db">
       <!-- News form -->
       <div v-if="activeTab === 'news'" class="db-sec">
+        <div class="db-sec-h"><LucideIcon :name="sectionIcon.news" /> News Details</div>
         <div class="form-grid">
           <div class="fg">
             <label class="fl">Tag</label>
@@ -280,6 +328,7 @@ onMounted(load)
 
       <!-- Events form -->
       <div v-else-if="activeTab === 'events'" class="db-sec">
+        <div class="db-sec-h"><LucideIcon :name="sectionIcon.events" /> Event Details</div>
         <div class="form-grid">
           <div class="fg col2">
             <label class="fl">Title <span class="req">*</span></label>
@@ -302,6 +351,7 @@ onMounted(load)
 
       <!-- Opening hours form -->
       <div v-else-if="activeTab === 'hours'" class="db-sec">
+        <div class="db-sec-h"><LucideIcon :name="sectionIcon.hours" /> Opening Hours Details</div>
         <div class="form-grid">
           <div class="fg col2">
             <label class="fl">Day Label <span class="req">*</span></label>
@@ -353,4 +403,35 @@ onMounted(load)
       </div>
     </div>
   </div>
+
+  <!-- ── Saved confirm ── -->
+  <div :class="['mscrim', { open: showSavedModal }]" @click.self="showSavedModal = false">
+    <div class="modal" v-if="showSavedModal">
+      <div class="modal-b">
+        <div class="modal-ic" style="background:var(--green-50)"><LucideIcon name="circle-check" style="width:22px;height:22px;color:var(--green-600)" /></div>
+        <div class="modal-t">{{ editing ? 'Saved' : 'Added' }}</div>
+        <div class="modal-s">
+          {{ tabTitle.replace(/s$/, '') }} {{ editing ? 'updated' : 'published' }} on the public landing page.
+        </div>
+        <div class="modal-f">
+          <button class="btn btn-primary btn-block" @click="showSavedModal = false">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
+
+<style scoped>
+.tab-bar { display: flex; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 18px; }
+.tab-btn {
+  flex: 1; justify-content: center;
+  padding: 9px 16px; border: none; background: none; cursor: pointer;
+  font-size: 13px; font-weight: 500; color: var(--muted);
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  display: flex; align-items: center; gap: 6px;
+  transition: color .15s, border-color .15s;
+  border-radius: var(--r2) var(--r2) 0 0;
+}
+.tab-btn:hover  { color: var(--ink); }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+</style>

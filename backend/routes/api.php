@@ -4,9 +4,11 @@ use App\Http\Controllers\Api\AcquisitionController;
 use App\Http\Controllers\Api\InboxController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookController;
+use App\Http\Controllers\Api\EResourceController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\FineController;
 use App\Http\Controllers\Api\InstitutionalRepositoryController;
+use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\LoanPolicyController;
 use App\Http\Controllers\Api\MarcImportController;
@@ -32,6 +34,20 @@ Route::get('/repository/stats',                          [InstitutionalRepositor
 Route::get('/repository/{institutionalRepository}',      [InstitutionalRepositoryController::class, 'show']);
 Route::get('/repository/{institutionalRepository}/read',   [InstitutionalRepositoryController::class, 'read']);
 Route::get('/repository/{institutionalRepository}/inline', [InstitutionalRepositoryController::class, 'inline']);
+
+Route::get('/journals',                      [JournalController::class, 'index']);
+Route::get('/journals/stats',                [JournalController::class, 'stats']);
+Route::get('/journals/{journal}',            [JournalController::class, 'show']);
+Route::get('/journals/{journal}/read',       [JournalController::class, 'read']);
+Route::get('/journals/{journal}/inline',     [JournalController::class, 'inline']);
+Route::get('/journals/{journal}/download',   [JournalController::class, 'download']);
+
+Route::get('/e-resources',                        [EResourceController::class, 'index']);
+Route::get('/e-resources/stats',                  [EResourceController::class, 'stats']);
+Route::get('/e-resources/{eResource}',            [EResourceController::class, 'show']);
+Route::get('/e-resources/{eResource}/read',       [EResourceController::class, 'read']);
+Route::get('/e-resources/{eResource}/inline',     [EResourceController::class, 'inline']);
+Route::get('/e-resources/{eResource}/download',   [EResourceController::class, 'download']);
 
 // Landing-page content — media (video/audio), news, events, opening hours
 Route::get('/media',                 [MediaController::class, 'index']);
@@ -88,6 +104,16 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/repository',                                [InstitutionalRepositoryController::class, 'store']);
         Route::post('/repository/{institutionalRepository}',      [InstitutionalRepositoryController::class, 'update']);
         Route::delete('/repository/{institutionalRepository}',    [InstitutionalRepositoryController::class, 'destroy']);
+
+        // Journals
+        Route::post('/journals',                   [JournalController::class, 'store']);
+        Route::post('/journals/{journal}',         [JournalController::class, 'update']);
+        Route::delete('/journals/{journal}',       [JournalController::class, 'destroy']);
+
+        // E-Resources
+        Route::post('/e-resources',                     [EResourceController::class, 'store']);
+        Route::post('/e-resources/{eResource}',         [EResourceController::class, 'update']);
+        Route::delete('/e-resources/{eResource}',       [EResourceController::class, 'destroy']);
 
         // Circulation (loans)
         Route::get('/loans',                   [LoanController::class, 'index']);

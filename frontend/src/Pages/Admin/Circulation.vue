@@ -222,7 +222,7 @@ function switchTab(tab: 'issue' | 'return' | 'renew' | 'accounts') {
       <div :class="['fbtn', { on: activeTab === 'issue' }]"    @click="switchTab('issue')">Issue</div>
       <div :class="['fbtn', { on: activeTab === 'return' }]"   @click="switchTab('return')">Return</div>
       <div :class="['fbtn', { on: activeTab === 'renew' }]"    @click="switchTab('renew')">Renew</div>
-      <div :class="['fbtn', { on: activeTab === 'accounts' }]" @click="switchTab('accounts')">Staff Accounts</div>
+      <div :class="['fbtn', { on: activeTab === 'accounts' }]" @click="switchTab('accounts')">Manage Accounts</div>
     </div>
   </div>
 

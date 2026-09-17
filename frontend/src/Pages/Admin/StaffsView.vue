@@ -253,7 +253,7 @@ onMounted(() => { fetchAccounts(); fetchStats() })
 
 <template>
   <div class="shead">
-    <div><h2>Staff Accounts</h2><p>{{ stats.total.toLocaleString() }} accounts · {{ stats.admins }} admins · {{ stats.staff }} staff · {{ stats.users }} members</p></div>
+    <div><h2>Manage Accounts</h2><p>{{ stats.total.toLocaleString() }} accounts · {{ stats.admins }} admins · {{ stats.staff }} staff · {{ stats.users }} members</p></div>
     <button class="btn btn-primary" @click="openAdd"><LucideIcon name="user-plus" class="ic-sm" /> Register Member</button>
   </div>
 

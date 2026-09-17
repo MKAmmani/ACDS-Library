@@ -43,12 +43,16 @@ const navItems = computed<NavItem[]>(() => [
   { section: 'Catalog' },
   { id: 'catalog',     label: 'Catalog Manager',     icon: 'book-copy',            path: '/staff/catalog' },
   { id: 'repository',  label: 'Institutional Repository',  icon: 'upload',          path: '/staff/repository' },
+  { id: 'journals',    label: 'Journals & Thesis',   icon: 'newspaper',            path: '/staff/journals' },
+  { id: 'e-resources', label: 'E-Resources',         icon: 'link',                 path: '/staff/e-resources' },
   { id: 'media',       label: 'Media Library',       icon: 'video',                path: '/staff/media' },
   { id: 'acquisition', label: 'Acquisitions',        icon: 'truck',                path: '/staff/acquisition' },
   { section: 'People' },
+  { id: 'users',       label: 'Members',             icon: 'users-round',          path: '/staff/users' },
   { id: 'inbox',       label: 'Inbox',               icon: 'message-square-text',  path: '/staff/inbox',       badge: inboxUnread.value || undefined, badgeClass: 'bg-red' },
   { section: 'Insights' },
   { id: 'reports',     label: 'Reports',             icon: 'chart-no-axes-column', path: '/staff/reports' },
+  { id: 'website',     label: 'Website Content',     icon: 'globe',                path: '/staff/website' },
 ])
 
 const pageTitle = computed(() => route.meta.title as string ?? 'Staff Panel')

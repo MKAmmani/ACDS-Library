@@ -43,13 +43,16 @@ const navItems = computed<NavItem[]>(() => [
   { section: 'Catalog' },
   { id: 'catalog',     label: 'Catalog Manager',     icon: 'book-copy',            path: '/admin/catalog' },
   { id: 'repository',  label: 'Institutional Repository',  icon: 'upload',        path: '/admin/repository' },
+  { id: 'journals',    label: 'Journals & Thesis',   icon: 'newspaper',            path: '/admin/journals' },
+  { id: 'e-resources', label: 'E-Resources',         icon: 'link',                 path: '/admin/e-resources' },
   { id: 'media',       label: 'Media Library',       icon: 'video',                path: '/admin/media' },
   { id: 'acquisition', label: 'Acquisitions',        icon: 'truck',                path: '/admin/acquisition' },
   { section: 'People' },
+  { id: 'accounts',    label: 'Manage Accounts',     icon: 'shield-check',         path: '/admin/accounts' },
   { id: 'inbox',       label: 'Inbox',               icon: 'message-square-text',  path: '/admin/inbox',       badge: inboxUnread.value || undefined, badgeClass: 'bg-red' },
   { section: 'Insights' },
   { id: 'reports',     label: 'Reports',             icon: 'chart-no-axes-column', path: '/admin/reports' },
-  { id: 'website',     label: 'Website Content',     icon: 'layout-panel-top',     path: '/admin/website' },
+  { id: 'website',     label: 'Website Content',     icon: 'globe',                path: '/admin/website' },
   { id: 'settings',    label: 'Settings',            icon: 'settings',             path: '/admin/settings' },
 ])
 

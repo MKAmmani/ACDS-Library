@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import LucideIcon from '@/components/LucideIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet } from '@/api/http'
@@ -12,13 +12,12 @@ const STORAGE_URL = BASE_URL.replace(/\/api$/, '') + '/storage/'
 
 const searchQuery   = ref('')
 const loading       = ref(false)
-const journals      = ref<any[]>([])
+const resources     = ref<any[]>([])
 const currentPage   = ref(1)
 const lastPage      = ref(1)
 const total         = ref(0)
 const downloading   = ref<number | null>(null)
 const opening       = ref<number | null>(null)
-const expandedId    = ref<number | null>(null)
 const showReader    = ref(false)
 const readerUrl     = ref('')
 const readerTitle   = ref('')
@@ -42,32 +41,32 @@ function onSearchInput() {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     currentPage.value = 1
-    fetchJournals()
+    fetchResources()
   }, 400)
 }
 
-async function fetchJournals() {
+async function fetchResources() {
   loading.value = true
   try {
     const params = new URLSearchParams()
     if (searchQuery.value.trim()) params.set('search', searchQuery.value.trim())
     params.set('page', String(currentPage.value))
 
-    const data = await apiGet<any>(`/journals?${params}`)
-    journals.value     = data.data      ?? []
+    const data = await apiGet<any>(`/e-resources?${params}`)
+    resources.value    = data.data      ?? []
     total.value        = data.total     ?? 0
-    lastPage.value     = data.last_page ?? 1
+    lastPage.value      = data.last_page ?? 1
     currentPage.value  = data.current_page ?? 1
   } catch {}
   loading.value = false
 }
 
-onMounted(fetchJournals)
+onMounted(fetchResources)
 
 function goToPage(p: number) {
   if (p < 1 || p > lastPage.value) return
   currentPage.value = p
-  fetchJournals()
+  fetchResources()
 }
 
 function coverSrc(item: any) {
@@ -83,7 +82,7 @@ function formatFileSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-async function openJournal(item: any) {
+async function openResource(item: any) {
   const kind = fileKind(item)
   readerDoc.value   = item
   readerTitle.value = item.title
@@ -108,7 +107,7 @@ async function openJournal(item: any) {
     const headers: Record<string, string> = {}
     if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`
     // base64 JSON envelope — avoids download-manager (IDM) interception of PDFs.
-    const res = await fetch(`${BASE_URL}/journals/${item.id}/inline`, { headers })
+    const res = await fetch(`${BASE_URL}/e-resources/${item.id}/inline`, { headers })
     if (!res.ok) throw new Error('Could not load the document.')
     const json = await res.json()
     const blob = await (await fetch(`data:${json.mime};base64,${json.data}`)).blob()
@@ -154,7 +153,7 @@ async function downloadItem(item: any) {
   try {
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`
-    const res = await fetch(`${BASE_URL}/journals/${item.id}/download`, { headers })
+    const res = await fetch(`${BASE_URL}/e-resources/${item.id}/download`, { headers })
     if (!res.ok) throw new Error('Download failed.')
     const blob = await res.blob()
     const url  = URL.createObjectURL(blob)
@@ -179,23 +178,23 @@ const pages = computed(() => {
   <div class="relative overflow-hidden" style="background:linear-gradient(115deg,#0B2E63 0%,var(--blue) 48%,var(--sky) 100%);padding:40px 0 0">
     <div class="relative z-[2] max-w-[1260px] mx-auto px-4 sm:px-7">
       <div class="inline-flex items-center gap-2 text-[11px] font-semibold tracking-[.18em] uppercase text-[var(--gold)] mb-3">
-        <span class="w-6 h-px bg-[var(--gold)]"></span> Academic Journals & Thesis
+        <span class="w-6 h-px bg-[var(--gold)]"></span> External Resources
       </div>
       <h1 class="text-[clamp(24px,3.5vw,40px)] font-bold text-white leading-tight tracking-tight mb-2" style="font-family:var(--display)">
-        Journals &amp; Thesis <em class="not-italic text-[var(--gold)]">Collection</em>
+        E-Resources <em class="not-italic text-[var(--gold)]">Collection</em>
       </h1>
       <p class="hidden sm:block text-[14.5px] text-white/70 font-light max-w-[520px] leading-[1.7] mb-5">
-        Digitised journals and theses, indexed article-by-article — open them online or download for offline reading.
+        E-books, reports and papers curated from outside the institution — open them online or download for offline reading.
       </p>
       <!-- Search bar -->
       <div class="bg-white rounded-t-xl p-5" style="box-shadow:0 -10px 36px rgba(11,46,99,.18)">
         <div class="flex gap-2.5">
           <div class="flex-1 flex items-center gap-3 border-[1.5px] border-[var(--line)] rounded-[10px] px-4 transition-all focus-within:border-[var(--blue)]">
             <LucideIcon name="search" :size="18" class="text-[var(--faint)] flex-shrink-0" />
-            <input v-model="searchQuery" @input="onSearchInput" type="text" placeholder="Search journals & theses by title or author…"
+            <input v-model="searchQuery" @input="onSearchInput" type="text" placeholder="Search e-resources by title or author…"
               class="flex-1 border-none outline-none py-3 text-[15px] text-[var(--ink)] bg-transparent placeholder:text-[var(--faint)]" />
           </div>
-          <button class="btn btn-primary btn-sm" @click="currentPage=1; fetchJournals()"><LucideIcon name="search" :size="15" /> Search</button>
+          <button class="btn btn-primary btn-sm" @click="currentPage=1; fetchResources()"><LucideIcon name="search" :size="15" /> Search</button>
         </div>
       </div>
     </div>
@@ -204,7 +203,7 @@ const pages = computed(() => {
   <!-- Body -->
   <div class="max-w-[1260px] mx-auto px-4 sm:px-7 py-6 pb-16">
     <div class="text-[13px] text-[var(--muted)] mb-4">
-      <strong class="text-[var(--navy)]">{{ loading ? '…' : total }}</strong> journals & theses
+      <strong class="text-[var(--navy)]">{{ loading ? '…' : total }}</strong> e-resources
     </div>
 
     <!-- Loading skeleton -->
@@ -219,55 +218,41 @@ const pages = computed(() => {
       </div>
     </div>
 
-    <!-- Journal cards -->
-    <div v-else-if="journals.length" class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))">
-      <div v-for="j in journals" :key="j.id"
+    <!-- Resource cards -->
+    <div v-else-if="resources.length" class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))">
+      <div v-for="r in resources" :key="r.id"
         class="bg-white border border-[var(--line)] rounded-xl overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:border-[var(--blue-100)] hover:shadow-[var(--sh2)]"
         style="box-shadow:var(--sh1)">
         <!-- Cover strip -->
         <div class="h-[120px] flex items-center justify-center relative" style="background:linear-gradient(180deg,#F3F2EC,#E8E6DC)">
-          <img v-if="coverSrc(j)" :src="coverSrc(j)!" :alt="j.title" class="h-full w-full object-cover absolute inset-0" />
-          <div v-else :class="['cover w-[76px] h-[98px]', coverCls(j.id)]">
-            <div class="cover-top" style="padding:6px 5px 0 7px"><div class="cover-t" style="font-size:7.5px">{{ j.title }}</div></div>
+          <img v-if="coverSrc(r)" :src="coverSrc(r)!" :alt="r.title" class="h-full w-full object-cover absolute inset-0" />
+          <div v-else :class="['cover w-[76px] h-[98px]', coverCls(r.id)]">
+            <div class="cover-top" style="padding:6px 5px 0 7px"><div class="cover-t" style="font-size:7.5px">{{ r.title }}</div></div>
           </div>
-          <span v-if="!j.file_path" class="absolute top-2.5 right-2.5 badge b-gray">No File</span>
+          <span v-if="!r.file_path" class="absolute top-2.5 right-2.5 badge b-gray">No File</span>
         </div>
         <!-- Body -->
         <div class="p-4">
           <div class="flex items-center gap-2 mb-2">
-            <span class="badge b-gold"><LucideIcon name="newspaper" :size="11" /> Journal</span>
-            <span v-if="j.year" class="text-[11px] text-[var(--faint)]">{{ j.year }}</span>
+            <span class="badge b-blue"><LucideIcon name="link" :size="11" /> {{ r.format || 'E-Resource' }}</span>
+            <span v-if="r.year" class="text-[11px] text-[var(--faint)]">{{ r.year }}</span>
           </div>
-          <div class="text-[14px] font-bold text-[var(--navy)] leading-snug mb-1 line-clamp-2" style="font-family:var(--display)">{{ j.title }}</div>
-          <div class="text-[12px] text-[var(--muted)] mb-2">{{ j.publisher_authors || '—' }}</div>
-          <div v-if="j.file_size || j.file_type || j.issn" class="text-[11.5px] text-[var(--faint)] mb-1 flex items-center gap-2">
-            <span v-if="j.file_type" class="uppercase font-semibold">{{ j.file_type }}</span>
-            <span v-if="j.file_size">· {{ formatFileSize(j.file_size) }}</span>
-            <span v-if="j.issn">· ISSN {{ j.issn }}</span>
-          </div>
-          <button v-if="j.articles?.length" type="button"
-            class="text-[11.5px] text-[var(--blue)] font-semibold mb-3 flex items-center gap-1.5"
-            @click="expandedId = expandedId === j.id ? null : j.id">
-            <LucideIcon name="list-ordered" :size="12" />
-            {{ j.articles.length }} article{{ j.articles.length === 1 ? '' : 's' }} indexed
-            <LucideIcon :name="expandedId === j.id ? 'chevron-down' : 'chevron-right'" :size="12" />
-          </button>
-          <div v-else class="mb-3"></div>
-          <div v-if="expandedId === j.id" class="mb-3 -mt-1 p-2.5 rounded-lg text-[11.5px] leading-relaxed" style="background:var(--bg)">
-            <div v-for="(a, i) in j.articles" :key="i" class="py-1" :class="{ 'border-t border-[var(--line)]': i !== 0 }">
-              <div class="font-semibold text-[var(--navy)]">{{ a.title }}</div>
-              <div class="text-[var(--muted)]">{{ a.authors || '—' }}<span v-if="a.page_range"> · pp. {{ a.page_range }}</span></div>
-            </div>
+          <div class="text-[14px] font-bold text-[var(--navy)] leading-snug mb-1 line-clamp-2" style="font-family:var(--display)">{{ r.title }}</div>
+          <div class="text-[12px] text-[var(--muted)] mb-2">{{ r.authors || r.publisher || '—' }}</div>
+          <div v-if="r.file_size || r.file_type || r.isbn" class="text-[11.5px] text-[var(--faint)] mb-3 flex items-center gap-2">
+            <span v-if="r.file_type" class="uppercase font-semibold">{{ r.file_type }}</span>
+            <span v-if="r.file_size">· {{ formatFileSize(r.file_size) }}</span>
+            <span v-if="r.isbn">· {{ r.isbn }}</span>
           </div>
           <div class="flex gap-2">
             <button class="flex-1 btn btn-primary btn-sm"
-              :disabled="!j.file_path || opening === j.id" @click="openJournal(j)">
-              <LucideIcon :name="opening===j.id ? 'refresh-cw' : 'book-open'" :size="14" :class="opening===j.id ? 'animate-spin' : ''" />
-              {{ opening === j.id ? 'Opening…' : 'Open' }}
+              :disabled="!r.file_path || opening === r.id" @click="openResource(r)">
+              <LucideIcon :name="opening===r.id ? 'refresh-cw' : 'book-open'" :size="14" :class="opening===r.id ? 'animate-spin' : ''" />
+              {{ opening === r.id ? 'Opening…' : 'Open' }}
             </button>
-            <button class="btn btn-ghost btn-sm" :disabled="!j.file_path || downloading === j.id"
-              @click="downloadItem(j)">
-              <LucideIcon :name="downloading===j.id ? 'refresh-cw' : 'download'" :size="14" />
+            <button class="btn btn-ghost btn-sm" :disabled="!r.file_path || downloading === r.id"
+              @click="downloadItem(r)">
+              <LucideIcon :name="downloading===r.id ? 'refresh-cw' : 'download'" :size="14" />
             </button>
           </div>
         </div>
@@ -276,14 +261,14 @@ const pages = computed(() => {
 
     <!-- Empty state -->
     <div v-else class="flex flex-col items-center py-16 text-center">
-      <LucideIcon name="newspaper" :size="44" class="text-[var(--faint)] mb-3" />
-      <div class="text-[15px] font-semibold text-[var(--navy)] mb-1">No journals or theses found</div>
+      <LucideIcon name="link" :size="44" class="text-[var(--faint)] mb-3" />
+      <div class="text-[15px] font-semibold text-[var(--navy)] mb-1">No e-resources found</div>
       <p class="text-[13px] text-[var(--muted)]">Try a different search term.</p>
     </div>
 
     <!-- Pagination -->
     <div v-if="lastPage > 1" class="flex items-center justify-between mt-8 pt-6 border-t border-[var(--line)] flex-wrap gap-3">
-      <div class="text-[12.5px] text-[var(--muted)]">Page {{ currentPage }} of {{ lastPage }} · {{ total }} journals & theses</div>
+      <div class="text-[12.5px] text-[var(--muted)]">Page {{ currentPage }} of {{ lastPage }} · {{ total }} e-resources</div>
       <div class="flex gap-1">
         <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1"
           :class="['min-w-[32px] h-[32px] px-1.5 flex items-center justify-center border rounded-md text-[12.5px] cursor-pointer transition-all',
