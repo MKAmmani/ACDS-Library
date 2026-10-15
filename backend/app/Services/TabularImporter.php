@@ -19,6 +19,7 @@ class TabularImporter
         // authors (incl. common "AUTHOURS" misspelling)
         'author' => 'authors', 'authors' => 'authors', 'authour' => 'authors',
         'authours' => 'authors', 'by' => 'authors', 'creator' => 'authors', 'writtenby' => 'authors',
+        'writer' => 'authors', 'writers' => 'authors',
         // isbn
         'isbn' => 'isbn', 'isbn13' => 'isbn', 'isbn10' => 'isbn', 'isbnno' => 'isbn',
         // publisher
@@ -34,13 +35,14 @@ class TabularImporter
         'summary' => 'description', 'notes' => 'description', 'note' => 'description',
         'remarks' => 'description', 'remark' => 'description',
         // subject
-        'subject' => 'subject_area', 'subjectarea' => 'subject_area',
+        'subject' => 'subject_area', 'subjects' => 'subject_area', 'subjectarea' => 'subject_area',
         'category' => 'subject_area', 'topic' => 'subject_area', 'genre' => 'subject_area',
         // call number
-        'callnumber' => 'call_number', 'callno' => 'call_number',
+        'callnumber' => 'call_number', 'callno' => 'call_number', 'callnum' => 'call_number',
         'classmark' => 'call_number', 'call' => 'call_number', 'classification' => 'call_number',
         // shelf
         'shelf' => 'shelf_location', 'shelflocation' => 'shelf_location', 'location' => 'shelf_location',
+        'shelves' => 'shelf_location', 'shelfmark' => 'shelf_location',
         // language
         'language' => 'language', 'lang' => 'language',
         // copies
@@ -247,19 +249,24 @@ class TabularImporter
             $isbn = substr(trim($isbn, '-'), 0, 20) ?: null;
         }
 
+        $authors = trim((string) ($row['authors'] ?? ''));
+        if ($authors === '/' || $authors === '-' || $authors === '.' || strcasecmp($authors, 'n/a') === 0) {
+            $authors = null;
+        }
+
         return array_filter([
             'title'            => $title ?: null,
-            'authors'          => trim((string) ($row['authors'] ?? '')) ?: null,
+            'authors'          => $authors ?: null,
             'isbn'             => $isbn,
             'publisher'        => trim((string) ($row['publisher'] ?? '')) ?: null,
             'year'             => $year,
-            'edition'          => trim((string) ($row['edition'] ?? '')) ?: null,
+            'edition'          => mb_substr(trim((string) ($row['edition'] ?? '')), 0, 100) ?: null,
             'description'      => trim((string) ($row['description'] ?? '')) ?: null,
-            'call_number'      => trim((string) ($row['call_number'] ?? '')) ?: null,
-            'shelf_location'   => trim((string) ($row['shelf_location'] ?? '')) ?: null,
+            'call_number'      => mb_substr(trim((string) ($row['call_number'] ?? '')), 0, 100) ?: null,
+            'shelf_location'   => mb_substr(trim((string) ($row['shelf_location'] ?? '')), 0, 255) ?: null,
             'subject_area'     => trim((string) ($row['subject_area'] ?? '')) ?: 'General',
-            'language'         => trim((string) ($row['language'] ?? '')) ?: 'English',
-            'format'           => trim((string) ($row['format'] ?? '')) ?: 'Book (Physical)',
+            'language'         => mb_substr(trim((string) ($row['language'] ?? '')), 0, 50) ?: 'English',
+            'format'           => mb_substr(trim((string) ($row['format'] ?? '')), 0, 50) ?: 'Book (Physical)',
             'number_of_copies' => $copies,
             'available_copies' => $copies,
             'cover_treatment'  => 'cv-blue',

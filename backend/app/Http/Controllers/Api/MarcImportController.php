@@ -53,31 +53,27 @@ class MarcImportController extends Controller
         $skipped  = 0;
         $errors   = [];
 
-        DB::beginTransaction();
-        try {
-            foreach ($books as $index => $data) {
-                if (empty($data['title'])) {
-                    $errors[] = 'Record ' . ($index + 1) . ': no title found — skipped.';
-                    $skipped++;
-                    continue;
-                }
-
-                // Skip duplicates by ISBN
-                if (! empty($data['isbn']) && Book::where('isbn', $data['isbn'])->exists()) {
-                    $skipped++;
-                    continue;
-                }
-
-                Book::create($data);
-                $imported++;
+        foreach ($books as $index => $data) {
+            if (empty($data['title'])) {
+                $errors[] = 'Record ' . ($index + 1) . ': no title found — skipped.';
+                $skipped++;
+                continue;
             }
 
-            DB::commit();
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return response()->json([
-                'message' => 'Import failed: ' . $e->getMessage(),
-            ], 500);
+            // Skip duplicates by ISBN
+            if (! empty($data['isbn']) && Book::where('isbn', $data['isbn'])->exists()) {
+                $skipped++;
+                continue;
+            }
+
+            try {
+                Book::create($data);
+                $imported++;
+            } catch (\Throwable $e) {
+                $skipped++;
+                $titleSnippet = mb_strimwidth($data['title'] ?? '', 0, 40, '...');
+                $errors[] = 'Record ' . ($index + 1) . ($titleSnippet ? " (\"{$titleSnippet}\")" : '') . ': ' . $e->getMessage();
+            }
         }
 
         return response()->json([

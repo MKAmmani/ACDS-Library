@@ -37,8 +37,8 @@ class AcquisitionController extends Controller
         }
 
         $data = $request->validate([
-            'title'          => ['required', 'string', 'max:255'],
-            'authors'        => ['nullable', 'string', 'max:255'],
+            'title'          => ['required', 'string'],
+            'authors'        => ['nullable', 'string'],
             'requested_by'   => ['nullable', 'string', 'max:255'],
             'estimated_cost' => ['nullable', 'numeric', 'min:0'],
             'copies'         => ['nullable', 'integer', 'min:1'],
@@ -54,8 +54,8 @@ class AcquisitionController extends Controller
     public function update(Request $request, Acquisition $acquisition): JsonResponse
     {
         $data = $request->validate([
-            'title'          => ['sometimes', 'string', 'max:255'],
-            'authors'        => ['nullable', 'string', 'max:255'],
+            'title'          => ['sometimes', 'string'],
+            'authors'        => ['nullable', 'string'],
             'requested_by'   => ['nullable', 'string', 'max:255'],
             'estimated_cost' => ['nullable', 'numeric', 'min:0'],
             'copies'         => ['nullable', 'integer', 'min:1'],
